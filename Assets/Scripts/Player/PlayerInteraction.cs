@@ -1,92 +1,127 @@
 using UnityEngine;
+using System.Collections.Generic; // 리스트 사용을 위해 필수
 
 public class PlayerInteraction : MonoBehaviour
 {
     [Header("Settings")]
-    public Transform holdPoint; // 물건을 들었을 때 위치할 부모 (플레이어 자식)
+    public float interactionRange = 1.5f; // 인접 판정 거리 (그리드 1칸이 1.0이므로 1.5면 넉넉함)
 
     private Collider2D _playerCollider;
-    private Cargo _holdingCargo = null; // 현재 들고 있는 화물
-    private Vector2 _lastMoveDir = Vector2.right; // 마지막으로 바라본 방향
 
-    private void Start()
+    // ★ [핵심 변경] 여러 개를 들기 위해 리스트로 변경
+    private List<Cargo> _holdingCargos = new List<Cargo>();
+
+    void Start()
     {
         _playerCollider = GetComponent<Collider2D>();
     }
 
     void Update()
     {
-        // 1. 방향 체크 (마지막 이동 방향 기억)
-        float x = Input.GetAxisRaw("Horizontal");
-        float y = Input.GetAxisRaw("Vertical");
-        if (x != 0 || y != 0)
+        // 1. 마우스 왼쪽 클릭: 물건 집기 / 놓기 (토글)
+        if (Input.GetMouseButtonDown(0))
         {
-            _lastMoveDir = new Vector2(x, y).normalized;
+            HandleMouseClick();
         }
 
-        // 2. 상호작용 키 (스페이스바)
+        // 2. 스페이스바: 들고 있는 모든 물건 내려놓기 (일괄 하차)
         if (Input.GetKeyDown(KeyCode.Space))
         {
-            if (_holdingCargo == null)
+            DropAllCargos();
+        }
+    }
+
+    // 마우스 클릭 처리
+    void HandleMouseClick()
+    {
+        // 마우스 화면 좌표 -> 월드 좌표 변환
+        Vector3 mousePos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
+        Vector2Int clickedGridPos = GridManager.Instance.WorldToGrid(mousePos);
+
+        // 클릭한 곳에 화물이 있는가?
+        Cargo clickedCargo = GridManager.Instance.GetCargoAt(clickedGridPos);
+
+        if (clickedCargo != null)
+        {
+            // A. 이미 내가 들고 있는 화물을 클릭했다면? -> 놓기 (선택적 해제)
+            if (_holdingCargos.Contains(clickedCargo))
             {
-                TryPickUp();
+                DropSpecificCargo(clickedCargo);
             }
+            // B. 바닥에 있는 화물을 클릭했다면? -> 집기 시도
             else
             {
-                TryDrop();
+                TryPickUp(clickedCargo);
             }
         }
     }
 
-    // 물건 집기 시도
-    void TryPickUp()
+    // 집기 로직
+    void TryPickUp(Cargo cargo)
     {
-        // 내 위치 + 바라보는 방향 1칸 앞
-        Vector2Int myGridPos = GridManager.Instance.WorldToGrid(transform.position);
-        Vector2Int targetPos = myGridPos + Vector2Int.RoundToInt(_lastMoveDir);
+        // 1. 거리가 가까운지 확인 (인접 체크)
+        // 플레이어 중심과 화물 중심 사이의 거리 계산
+        float distance = Vector3.Distance(transform.position, cargo.transform.position);
 
-        Cargo targetCargo = GridManager.Instance.GetCargoAt(targetPos);
-
-        if (targetCargo != null)
+        if (distance <= interactionRange)
         {
-            GridManager.Instance.UnregisterCargo(targetPos);
+            // 장부에서 제거
+            GridManager.Instance.UnregisterCargo(cargo.CurrentGridPos);
 
-            _holdingCargo = targetCargo;
-            targetCargo.OnPickedUp(transform, _playerCollider);
+            // 리스트에 추가
+            _holdingCargos.Add(cargo);
+
+            // 화물에게 "나한테 붙어!" 명령 (이전 코드 활용)
+            // Cargo 스크립트가 offset을 계산해서 알아서 플레이어 주변에 붙음
+            cargo.OnPickedUp(transform, _playerCollider);
         }
         else
         {
-            Debug.Log("앞에 물건이 없습니다.");
+            Debug.Log("너무 멉니다! 가까이 가서 클릭하세요.");
         }
     }
 
-    // 물건 놓기 시도
-    void TryDrop()
+    // 특정 화물 하나만 놓기
+    void DropSpecificCargo(Cargo cargo)
     {
-        // 내 위치 + 바라보는 방향 1칸 앞
-        Vector2Int boxGridPos = GridManager.Instance.WorldToGrid(_holdingCargo.transform.position);
+        // 현재 화물이 떠 있는 위치의 그리드 좌표 계산
+        Vector2Int currentGridPos = GridManager.Instance.WorldToGrid(cargo.transform.position);
 
-        if (GridManager.Instance.IsValidGridPosition(boxGridPos) &&
-            !GridManager.Instance.IsOccupied(boxGridPos))
+        // 놓을 수 있는 땅인지 확인
+        if (GridManager.Instance.IsValidGridPosition(currentGridPos) &&
+            !GridManager.Instance.IsOccupied(currentGridPos))
         {
-            Vector3 snapPos = GridManager.Instance.GridToWorldCenter(boxGridPos);
+            // 리스트에서 제거
+            _holdingCargos.Remove(cargo);
 
-            _holdingCargo.OnDropped(snapPos, boxGridPos, _playerCollider);
+            // 내려놓기 명령
+            Vector3 snapPos = GridManager.Instance.GridToWorldCenter(currentGridPos);
+            cargo.OnDropped(snapPos, currentGridPos, _playerCollider);
 
-            GridManager.Instance.RegisterCargo(boxGridPos, _holdingCargo);
-
-            _holdingCargo = null;
+            // 장부 등록
+            GridManager.Instance.RegisterCargo(currentGridPos, cargo);
         }
         else
         {
-            Debug.Log($"거기({boxGridPos})에는 놓을 수 없습니다.");
+            Debug.Log("여기에 내려놓을 수 없습니다 (벽이거나 다른 화물 위)");
         }
     }
 
-    // 디버깅: 바라보는 방향 표시
-    private void OnDrawGizmos()
+    // 모두 내려놓기 (스페이스바)
+    void DropAllCargos()
     {
-        Gizmos.color = Color.yellow;
-        Gizmos.DrawLine(transform.position, transform.position + (Vector3)_lastMoveDir);
+        // 리스트를 역순으로 순회하거나, 별도 리스트 복사해서 처리 (삭제 시 오류 방지)
+        // 여기서는 간단하게 처리
+        for (int i = _holdingCargos.Count - 1; i >= 0; i--)
+        {
+            DropSpecificCargo(_holdingCargos[i]);
+        }
+    }
+
+    // 디버깅: 인접 범위 그리기
+    private void OnDrawGizmosSelected()
+    {
+        Gizmos.color = Color.cyan;
+        Gizmos.DrawWireSphere(transform.position, interactionRange);
     }
 }
