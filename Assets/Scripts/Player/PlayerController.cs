@@ -6,6 +6,10 @@ public class PlayerController : MonoBehaviour
     [Header("Movement")]
     public float moveSpeed = 5f;
 
+    [Header("Snapping")]
+    public float snapSpeed = 10f;
+    public float snapThreshold = 0.01f;
+
     private Rigidbody2D _rb;
     private Vector2 _inputDir;
     private Vector2Int _currentGridPos; // 현재 캐릭터가 서 있는 그리드 좌표
@@ -41,10 +45,16 @@ public class PlayerController : MonoBehaviour
     void FixedUpdate()
     {
         // 물리를 이용한 이동 (벽 비비기 가능)
-        _rb.MovePosition(_rb.position + _inputDir * moveSpeed * Time.fixedDeltaTime);
+        if (_inputDir != Vector2.zero)
+        {
+            _rb.MovePosition(_rb.position + _inputDir * moveSpeed * Time.fixedDeltaTime);
+        }
+        else
+        {
+            SnapToGrid();
+        }
 
         // 바라보는 방향 회전 (선택 사항)
-
         /*
         if (_inputDir != Vector2.zero)
         {
@@ -52,5 +62,31 @@ public class PlayerController : MonoBehaviour
             transform.rotation = Quaternion.AngleAxis(angle, Vector3.forward);
         }
         */
+    }
+
+    void SnapToGrid()
+    {
+        // 현재 내 위치 기준 가장 가까운 그리드 좌표 찾기
+        Vector2Int closestGridPos = GridManager.Instance.WorldToGrid(transform.position);
+
+        // 그 그리드의 정중앙 좌표(목표점) 가져오기
+        Vector2 targetPos = GridManager.Instance.GridToWorldCenter(closestGridPos);
+
+        // 현재 위치와 목표점 사이의 거리 계산
+        float distance = Vector2.Distance(_rb.position, targetPos);
+
+        // 아직 목표점에 도착하지 않았다면 부드럽게 이동 (Lerp)
+        if (distance > snapThreshold)
+        {
+            // Lerp를 사용하여 부드럽게 감속하며 이동
+            Vector2 smoothPos = Vector2.Lerp(_rb.position, targetPos, Time.fixedDeltaTime * snapSpeed);
+            _rb.MovePosition(smoothPos);
+        }
+        // 목표점에 거의 도착했다면 확실하게 고정 (미세한 떨림 방지)
+        else
+        {
+            // 이미 거의 중앙이라면 연산을 멈추거나 미세 조정만 수행
+            // _rb.MovePosition(targetPos); // 완전 고정을 원하면 주석 해제 (딱딱할 수 있음)
+        }
     }
 }
