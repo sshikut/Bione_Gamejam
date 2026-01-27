@@ -49,7 +49,7 @@ public class CargoProperty : CargoTrait
         if (data == null) return;
 
         // A. 수치 초기화
-        currentFreshness = data.maxFreshness;
+        currentFreshness = 100f;
 
         // B. 디버깅 편의를 위해 오브젝트 이름 변경 (예: Cargo_Milk)
         gameObject.name = $"Cargo_{data.itemName}";

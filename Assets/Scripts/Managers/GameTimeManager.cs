@@ -10,9 +10,20 @@ public enum GameState
     GameOver     // 중간 파산 등
 }
 
+public enum Weather
+{
+    Normal,     // 평소
+    HeatWave,   // 폭염
+    RainySeason,// 장마
+    ColdWave    // 한파
+}
+
 public class GameTimeManager : MonoBehaviour
 {
     public static GameTimeManager Instance;
+
+    [Header("Environment")]
+    public Weather currentWeather = Weather.Normal;
 
     [Header("Settings")]
     public int maxDays = 14;          // 총 14일
