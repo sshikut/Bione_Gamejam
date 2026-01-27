@@ -8,6 +8,7 @@ public class CargoProperty : CargoTrait
     public Sprite defaultSpoiledIcon;
     public Sprite defaultWetIcon;
     public Sprite defaultHeatedIcon;
+    public Sprite defaultFrozenBurstIcon;
 
     [Header("Runtime Status")]
     [Tooltip("현재 남은 신선도")]
@@ -16,6 +17,8 @@ public class CargoProperty : CargoTrait
     [Header("State Info")]
     public CargoState currentState = CargoState.Normal;
     public int stenchStack = 0; // 악취 스택
+    public int freezingStack = 0;
+    private float _freezingTimer = 0f;
 
     private float _stenchTimer = 0f;
 
@@ -100,6 +103,7 @@ public class CargoProperty : CargoTrait
 
         // 2. 신선도 변화 계산
         CalculateFreshnessChange();
+        CheckFreezingBurst();
 
         // 3. 상태 이상 효과 처리 (악취 전파 등)
         HandleStateEffects();
@@ -227,7 +231,15 @@ public class CargoProperty : CargoTrait
         // 4. 일반적인 0 도달 (장마철 등)
         else
         {
-            ChangeState(CargoState.Spoiled); // 그냥 상함
+            if (StorageType == StorageType.Frozen)
+            {
+                ChangeState(CargoState.Wet);
+                ExplodeWetDamage();
+            }
+            else
+            {
+                ChangeState(CargoState.Spoiled); // 나머지는 그냥 상함
+            }
         }
     }
 
@@ -255,12 +267,52 @@ public class CargoProperty : CargoTrait
         }
     }
 
+    private void CheckFreezingBurst()
+    {
+        if (currentFreshness > 100f)
+        {
+            _freezingTimer += 1.0f;
+
+            if (_freezingTimer >= 10.0f)
+            {
+                _freezingTimer = 0f;
+                freezingStack++;
+
+                if (freezingStack >= 3)
+                {
+                    ChangeState(CargoState.FrozenBurst);
+                }
+            }
+        }
+        else
+        {
+            freezingStack = 0;
+            _freezingTimer = 0f;
+        }
+    }
+
     // 주변에 악취 스택 쌓기
     private void SpreadStench()
     {
         // 상하좌우(또는 8방향) 이웃에게 스택 추가
         // ... (이웃 찾기 로직) ...
         // neighborProp.AddStenchStack(1);
+
+        Vector2Int[] dirs = { Vector2Int.up, Vector2Int.down, Vector2Int.left, Vector2Int.right,
+                              new Vector2Int(1, 1), new Vector2Int(1, -1), new Vector2Int(-1, 1), new Vector2Int(-1, -1) };
+
+        foreach (var dir in dirs)
+        {
+            Cargo neighbor = GridManager.Instance.GetCargoAt(_cargo.CurrentGridPos + dir);
+            if (neighbor != null)
+            {
+                CargoProperty neighborProp = neighbor.GetComponent<CargoProperty>();
+                if (neighborProp != null && neighborProp.StorageType != StorageType.RoomTemp)
+                {
+                    neighborProp.AddStenchStack(1);
+                }
+            }
+        }
     }
 
     // 외부에서 악취 스택을 쌓을 때 호출
@@ -278,11 +330,28 @@ public class CargoProperty : CargoTrait
     // [녹음] 이벤트: 주변에 물 뿌리기 (데미지)
     private void ExplodeWetDamage()
     {
-        // 8방향 이웃 찾기
-        // ...
-        // if (이웃 == 냉장) 이웃.ApplyDamage(60);
-        // else 이웃.ApplyDamage(30);
-        // 이웃.ChangeState(CargoState.Wet); // 이웃도 젖음 상태로 만듦?
+        Vector2Int[] dirs = { Vector2Int.up, Vector2Int.down, Vector2Int.left, Vector2Int.right,
+                              new Vector2Int(1, 1), new Vector2Int(1, -1), new Vector2Int(-1, 1), new Vector2Int(-1, -1) };
+
+        foreach (var dir in dirs)
+        {
+            Cargo neighbor = GridManager.Instance.GetCargoAt(_cargo.CurrentGridPos + dir);
+            if (neighbor != null)
+            {
+                CargoProperty neighborProp = neighbor.GetComponent<CargoProperty>();
+                if (neighborProp != null)
+                {
+                    if (neighborProp.StorageType == StorageType.Refrigerated)
+                    {
+                        neighborProp.ApplyDamage(40f);
+                    }
+                    else if (neighborProp.StorageType != StorageType.RoomTemp)
+                    {
+                        neighborProp.ApplyDamage(20f);
+                    }
+                }
+            }
+        }
     }
 
     // --- [시각 효과] ---
@@ -320,17 +389,20 @@ public class CargoProperty : CargoTrait
                 if (defaultSpoiledIcon != null)
                     sr.sprite = defaultSpoiledIcon;
                 break;
+
+            case CargoState.FrozenBurst:
+                if (defaultFrozenBurstIcon != null)
+                {
+                    sr.sprite = defaultFrozenBurstIcon;
+                }
+                break;
         }
 
     }
 
-    // 신선도가 0이 되었을 때 호출
-    private void OnSpoiled()
+    public void ApplyDamage(float damageAmount)
     {
-        Debug.Log($"{gameObject.name} 화물이 상했습니다!");
-
-        // 예: 색을 검게 칠하거나, 파리 날리는 이펙트 추가
-        SpriteRenderer sr = GetComponent<SpriteRenderer>();
-        if (sr != null) sr.color = Color.gray;
+        // 피해는 음수로 처리해서 ApplyFreshness에 넘김
+        ApplyFreshness(-damageAmount);
     }
 }
