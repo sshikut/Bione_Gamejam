@@ -12,8 +12,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 08bfcf151c50cfc41b9303be3b235f30, type: 3}
   m_Name: Cold
   m_EditorClassIdentifier: 
+  category: 1
   itemName: Cold_0
   icon: {fileID: 21300000, guid: 219f7fb7f55fc9e498aeec6b3c92290d, type: 3}
   displayColor: {r: 1, g: 1, b: 1, a: 1}
   storageType: 1
-  maxFreshness: 100
+  maxFreshness: 101

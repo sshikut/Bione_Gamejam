@@ -5,18 +5,46 @@ public class CargoProperty : CargoTrait
     [Header("Data Source")]
     [Tooltip("이 화물의 종류를 결정하는 데이터 파일")]
     public ItemData data;
+    public Sprite defaultSpoiledIcon;
+    public Sprite defaultWetIcon;
+    public Sprite defaultHeatedIcon;
 
     [Header("Runtime Status")]
     [Tooltip("현재 남은 신선도")]
     public float currentFreshness;
 
+    [Header("State Info")]
+    public CargoState currentState = CargoState.Normal;
+    public int stenchStack = 0; // 악취 스택
+
+    private float _stenchTimer = 0f;
+
+    [SerializeField] private bool _isNearHeat; // 열기 감지
+    [SerializeField] private bool _isNearCold; // 냉기 감지
+
     // 신선도 감소량 (기획에 따라 Inspector에서 조절 혹은 ItemData로 이동 가능)
     [SerializeField] private float _decayAmount = 1.0f;
 
-    // --- [프로퍼티] ---
+    public bool testBool = false;
 
-    // 데이터가 없으면 기본값(실온) 반환 (Null 에러 방지)
-    public StorageType StorageType => data != null ? data.storageType : StorageType.RoomTemp;
+    public StorageType StorageType
+    {
+        get
+        {
+            // 1. 데이터가 없으면 실온
+            if (data == null) return StorageType.RoomTemp;
+
+            // 2. 이미 망가진 상태(상함, 젖음, 가열 등)라면 -> 원래 속성 무시하고 '실온' 리턴
+            // (이렇게 하면 더 이상 신선도 감소 로직이 돌지 않고, 주변에 속성 영향도 주지 않음)
+            if (currentState != CargoState.Normal)
+            {
+                return StorageType.RoomTemp;
+            }
+
+            // 3. 정상 상태라면 -> 원래 데이터의 속성 반환
+            return data.storageType;
+        }
+    }
 
     // 신선도가 0 이하인지 확인
     public bool IsSpoiled => currentFreshness <= 0;
@@ -55,7 +83,7 @@ public class CargoProperty : CargoTrait
         gameObject.name = $"Cargo_{data.itemName}";
 
         // C. 외형 업데이트
-        UpdateVisuals();
+        UpdateVisuals(currentState);
     }
 
     // --- [게임 로직] ---
@@ -63,28 +91,203 @@ public class CargoProperty : CargoTrait
     // GameTimeManager 혹은 Cargo.cs의 코루틴에서 주기적으로 호출
     public override void OnTick()
     {
-        if (data == null) return;
-        if (IsSpoiled) return; // 이미 썩었으면 계산 중단
+        if (_cargo == null || data == null) return;
+        // 0. 이미 상태가 변해서 기능을 상실했으면 로직 중단? 
+        // (기획에 따라 Spoiled 상태여도 악취는 풍겨야 하므로 계속 돔)
 
-        // ★ 규칙: 실온(RoomTemp)을 제외한 나머지 속성들은 신선도가 감소함
-        if (StorageType != StorageType.RoomTemp)
+        // 1. 주변 환경 스캔
+        ScanSurroundings();
+
+        // 2. 신선도 변화 계산
+        CalculateFreshnessChange();
+
+        // 3. 상태 이상 효과 처리 (악취 전파 등)
+        HandleStateEffects();
+    }
+
+    private void ScanSurroundings()
+    {
+        if (_cargo == null) return;
+
+        _isNearHeat = false;
+        _isNearCold = false;
+
+        Vector2Int[] dirs = { Vector2Int.up, Vector2Int.down, Vector2Int.left, Vector2Int.right,
+                              new Vector2Int(1, 1), new Vector2Int(1, -1), new Vector2Int(-1, 1), new Vector2Int(-1, -1) }; // 8방향 열기 체크
+
+        foreach (var dir in dirs)
         {
-            currentFreshness -= _decayAmount;
-
-            if (currentFreshness <= 0)
+            Cargo neighbor = GridManager.Instance.GetCargoAt(_cargo.CurrentGridPos + dir);
+            if (neighbor != null)
             {
-                currentFreshness = 0;
-                OnSpoiled(); // 썩었을 때 처리
+                CargoProperty neighborProp = neighbor.GetComponent<CargoProperty>();
+                if (neighborProp != null)
+                {
+                    // 열기는 8방향, 냉기는 4방향(또는 8방향) 등 기획에 따라 조절
+                    if (CargoInteractionLogic.IsHeatSource(neighborProp) && (data.storageType != StorageType.Heated)) _isNearHeat = true;
+                    if (CargoInteractionLogic.IsColdSource(neighborProp) && (data.storageType != StorageType.Frozen && data.storageType != StorageType.Heated)) _isNearCold = true;
+                }
             }
         }
+    }
 
-        // (추후 추가) 주변 화물과의 상호작용(디메리트) 체크
-        // CheckSurroundings();
+    private void CalculateFreshnessChange()
+    {
+        float changeAmount = 0f;
+        float decayBase = 1.0f; // 기본 감소량
+
+        Weather weather = GameTimeManager.Instance.currentWeather;
+
+        // --- [감소 로직] ---
+        if (StorageType != StorageType.RoomTemp)
+        {
+            float multiplier = 1.0f;
+
+            // 1. 폭염 체크
+            multiplier *= CargoInteractionLogic.GetWeatherDecayMultiplier(weather, StorageType, _isNearCold);
+
+            // 2. 장마 체크 (식품 & 4면 밀착)
+            if (weather == Weather.RainySeason && data.category == ItemCategory.Food)
+            {
+                if (CargoInteractionLogic.CheckRainySeasonPenalty(_cargo))
+                {
+                    multiplier *= 3.0f;
+                }
+            }
+
+            // 3. 열기 효과 (주변에 온장이 있으면)
+            if (_isNearHeat)
+            {
+                // 감소량 대폭 증가? 혹은 고정 수치 감소?
+                // 예: 열기 있으면 2배 빨리 썩음
+                multiplier += 1.0f;
+            }
+
+            changeAmount -= (decayBase * multiplier);
+        }
+
+        // --- [증가(회복/과냉각) 로직] ---
+        // 한파 또는 냉동 주변
+        bool isColdWave = (weather == Weather.ColdWave);
+
+        if ((isColdWave || _isNearCold) && (StorageType == StorageType.Refrigerated || StorageType == StorageType.Liquid))
+        {
+            // 한파거나 냉동 옆이면 신선도 증가
+            changeAmount += 2.0f;
+        }
+
+        // --- [최종 적용] ---
+        if (testBool) Debug.Log(changeAmount);
+        ApplyFreshness(changeAmount);
+    }
+
+    private void ApplyFreshness(float amount)
+    {
+        currentFreshness += amount;
+        
+        // 최대치 제한 (130 등)
+        if (currentFreshness > data.maxFreshness) currentFreshness = data.maxFreshness;
+
+        // 0 이하 도달 시 => [이벤트 트리거] 발동!
+        if (currentFreshness <= 0)
+        {
+            currentFreshness = 0;
+            if (currentState == CargoState.Normal) // 정상일 때만 트리거
+            {
+                Debug.Log("상해버림");
+                TriggerZeroFreshnessEvent();
+            }
+        }
+    }
+
+    // ★ 신선도 0 도달 시 발생하는 특수 이벤트
+    private void TriggerZeroFreshnessEvent()
+    {
+        // 1. [녹음] 냉동 + 열기 옆
+        if (StorageType == StorageType.Frozen && _isNearHeat)
+        {
+            ChangeState(CargoState.Wet);
+            // 주변에 '즉시' 물 뿌리기 (데미지)
+            ExplodeWetDamage();
+        }
+        // 2. [상함] 냉장 + 열기 옆
+        else if (StorageType == StorageType.Refrigerated && _isNearHeat)
+        {
+            // 즉시 상함 상태가 되진 않고, 악취를 풍기기 시작하는 상태(전구간)로 봐도 되고
+            // 기획상으로는 "신선도 0 -> 악취 스택 시작 -> 5스택 -> 상함" 인가요?
+            // "신선도가 0이 되면... 악취 스택을 축적" 이라고 하셨으니
+            // 여기서는 일단 'Spoiled(상함)' 상태로 만들고, Spoiled 상태일 때 악취를 뿜게 합시다.
+            ChangeState(CargoState.Spoiled);
+        }
+        // 3. [가열] 액상 + 열기 옆
+        else if (StorageType == StorageType.Liquid && _isNearHeat)
+        {
+            ChangeState(CargoState.HeatedState); // 이제 나도 온장이다!
+        }
+        // 4. 일반적인 0 도달 (장마철 등)
+        else
+        {
+            ChangeState(CargoState.Spoiled); // 그냥 상함
+        }
+    }
+
+    private void ChangeState(CargoState newState)
+    {
+        currentState = newState;
+        Debug.Log($"{name} 상태 변경: {newState}");
+
+        // 비주얼 변경 (색깔 등)
+        UpdateVisuals(currentState);
+    }
+
+    // --- [상태별 지속 효과] ---
+    private void HandleStateEffects()
+    {
+        // A. 내가 상했다면 -> 주변에 악취 뿌리기
+        if (currentState == CargoState.Spoiled)
+        {
+            _stenchTimer += 1.0f; // OnTick이 1초라고 가정
+            if (_stenchTimer >= 10.0f) // 10초마다
+            {
+                _stenchTimer = 0;
+                SpreadStench();
+            }
+        }
+    }
+
+    // 주변에 악취 스택 쌓기
+    private void SpreadStench()
+    {
+        // 상하좌우(또는 8방향) 이웃에게 스택 추가
+        // ... (이웃 찾기 로직) ...
+        // neighborProp.AddStenchStack(1);
+    }
+
+    // 외부에서 악취 스택을 쌓을 때 호출
+    public void AddStenchStack(int amount)
+    {
+        stenchStack += amount;
+        if (stenchStack >= 5 && currentState == CargoState.Normal)
+        {
+            // 5스택 쌓이면 나도 상함!
+            currentFreshness = 0;
+            ChangeState(CargoState.Spoiled);
+        }
+    }
+
+    // [녹음] 이벤트: 주변에 물 뿌리기 (데미지)
+    private void ExplodeWetDamage()
+    {
+        // 8방향 이웃 찾기
+        // ...
+        // if (이웃 == 냉장) 이웃.ApplyDamage(60);
+        // else 이웃.ApplyDamage(30);
+        // 이웃.ChangeState(CargoState.Wet); // 이웃도 젖음 상태로 만듦?
     }
 
     // --- [시각 효과] ---
 
-    private void UpdateVisuals()
+    private void UpdateVisuals(CargoState cargo)
     {
         SpriteRenderer sr = GetComponent<SpriteRenderer>();
         if (sr == null) return;
@@ -100,6 +303,25 @@ public class CargoProperty : CargoTrait
             sr.sprite = null; // 스프라이트 제거 (네모 박스)
             sr.color = data.displayColor; // 지정된 색상 적용
         }
+
+        switch (cargo)
+        {
+            case CargoState.Wet:
+                if (defaultWetIcon != null)
+                    sr.sprite = defaultWetIcon;
+                break;
+
+            case CargoState.HeatedState:
+                if (defaultHeatedIcon != null)
+                    sr.sprite = defaultHeatedIcon;
+                break;
+
+            case CargoState.Spoiled:
+                if (defaultSpoiledIcon != null)
+                    sr.sprite = defaultSpoiledIcon;
+                break;
+        }
+
     }
 
     // 신선도가 0이 되었을 때 호출

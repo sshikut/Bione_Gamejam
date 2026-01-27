@@ -3,6 +3,14 @@ public abstract class CargoTrait : MonoBehaviour
 {
     protected Cargo _cargo;
 
+    protected virtual void Awake()
+    {
+        if (_cargo == null)
+        {
+            _cargo = GetComponent<Cargo>();
+        }
+    }
+
     public virtual void Initialize(Cargo cargo)
     {
         _cargo = cargo;

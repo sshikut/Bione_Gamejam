@@ -159,5 +159,13 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   data: {fileID: 0}
+  defaultSpoiledIcon: {fileID: 21300000, guid: 5db0cf8c09ce0ab41b88d004f565589a, type: 3}
+  defaultWetIcon: {fileID: 21300000, guid: 976378c437890c54cbc6b8789db75ea7, type: 3}
+  defaultHeatedIcon: {fileID: 21300000, guid: f8210583347080d4a8506247146ce748, type: 3}
   currentFreshness: 0
+  currentState: 0
+  stenchStack: 0
+  _isNearHeat: 0
+  _isNearCold: 0
   _decayAmount: 1
+  testBool: 0

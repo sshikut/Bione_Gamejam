@@ -12,8 +12,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 08bfcf151c50cfc41b9303be3b235f30, type: 3}
   m_Name: Liquid
   m_EditorClassIdentifier: 
+  category: 1
   itemName: Liquid_0
   icon: {fileID: 21300000, guid: 9583aa0ffb22df445b6fba8de90bdfd9, type: 3}
   displayColor: {r: 1, g: 1, b: 1, a: 1}
   storageType: 4
-  maxFreshness: 100
+  maxFreshness: 130

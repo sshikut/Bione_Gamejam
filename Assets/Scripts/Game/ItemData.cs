@@ -45,12 +45,12 @@ public class ItemData : ScriptableObject
         {
             case StorageType.Refrigerated:
             case StorageType.Liquid:
-                maxFreshness = 130;
+            case StorageType.Frozen:
+                maxFreshness = 101;
                 break;
 
             case StorageType.RoomTemp:
             case StorageType.Heated:
-            case StorageType.Frozen:
                 maxFreshness = 100; // ±âº»°ª
                 break;
         }

@@ -1052,6 +1052,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9e6b72da87b12b74fa91237ec9fdd927, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  currentWeather: 0
   maxDays: 14
   minutesPerDay: 0.5
   tickInterval: 1
@@ -1548,7 +1549,7 @@ SpriteRenderer:
   m_SortingLayerID: 459945331
   m_SortingLayer: 4
   m_SortingOrder: 0
-  m_Sprite: {fileID: 21300000, guid: 6ccff75d6aa11e6419abad8a5ca69dad, type: 3}
+  m_Sprite: {fileID: 21300000, guid: 4734b884bbc50174693d7c7a9006c8f6, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
   m_FlipY: 0
@@ -1612,7 +1613,7 @@ BoxCollider2D:
   m_SpriteTilingProperty:
     border: {x: 0, y: 0, z: 0, w: 0}
     pivot: {x: 0.5, y: 0.5}
-    oldSize: {x: 1, y: 0.95757574}
+    oldSize: {x: 1, y: 1}
     newSize: {x: 1, y: 1}
     adaptiveTilingThreshold: 0.5
     drawMode: 0
