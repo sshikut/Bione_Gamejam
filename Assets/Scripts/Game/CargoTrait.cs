@@ -8,7 +8,22 @@ public abstract class CargoTrait : MonoBehaviour
         _cargo = cargo;
     }
 
-    // 1초마다(혹은 턴마다) 호출될 함수
+    protected virtual void OnEnable()
+    {
+        if (GameTimeManager.Instance != null)
+        {
+            GameTimeManager.Instance.OnTickEvent += OnTick;
+        }
+    }
+
+    protected virtual void OnDisable()
+    {
+        if (GameTimeManager.Instance != null)
+        {
+            GameTimeManager.Instance.OnTickEvent -= OnTick;
+        }
+    }
+
     public virtual void OnTick() { }
 
     public virtual void OnPickedUp() { }

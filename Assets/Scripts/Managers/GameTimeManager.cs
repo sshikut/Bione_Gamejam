@@ -17,6 +17,7 @@ public class GameTimeManager : MonoBehaviour
     [Header("Settings")]
     public int maxDays = 14;          // 총 14일
     public float minutesPerDay = 3f;  // 하루 = 3분 (조절 가능)
+    public float tickInterval = 1.0f;
 
     [Header("Current Status (Read Only)")]
     public int currentDay = 1;
@@ -27,6 +28,10 @@ public class GameTimeManager : MonoBehaviour
     public event Action<int> OnDayStart; // 인자: 시작된 날짜
     public event Action OnDayEnd;
     public event Action OnGameClear;
+
+    public event Action OnTickEvent;
+
+    private float _timer;
 
     private void Awake()
     {
@@ -54,6 +59,15 @@ public class GameTimeManager : MonoBehaviour
             if (currentDayTimeLeft <= 0)
             {
                 EndDay();
+            }
+
+            // 신선도 감소 로직, tickInterval 마다 감소
+            _timer += Time.deltaTime;
+
+            if (_timer >= tickInterval)
+            {
+                _timer = 0;
+                OnTickEvent?.Invoke();
             }
         }
     }
