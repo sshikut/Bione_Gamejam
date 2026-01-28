@@ -7,7 +7,7 @@ public class CargoSpawner : MonoBehaviour
     [Tooltip("생성할 기본 화물 프리팹 (껍데기)")]
     public GameObject baseCargoPrefab;
 
-    [Tooltip("생성 가능한 화물 데이터 목록 (여기에 Data_Apple, Data_Milk 등을 넣으세요)")]
+    [Tooltip("생성 가능한 화물 데이터 목록")]
     public ItemData[] spawnableItems;
 
     [Tooltip("스폰 주기 (초)")]
@@ -16,13 +16,49 @@ public class CargoSpawner : MonoBehaviour
     [Tooltip("한 번에 생성할 세로 줄 수 (예: 5칸)")]
     public int spawnHeight = 5;
 
-    // 내부 타이머
     private float _timer;
+    private bool _isSpawning = false; // 현재 스폰 중인가?
+
+    private void Start()
+    {
+        if (GameTimeManager.Instance != null)
+        {
+            GameTimeManager.Instance.OnStateChanged += HandleStateChange;
+
+            // 시작하자마자 현재 상태 체크 (혹시 중간에 켜졌을 경우 대비)
+            HandleStateChange(GameTimeManager.Instance.currentState);
+        }
+    }
+
+    private void OnDestroy()
+    {
+        // 오브젝트가 사라질 때 구독 해제 (메모리 누수 방지)
+        if (GameTimeManager.Instance != null)
+        {
+            GameTimeManager.Instance.OnStateChanged -= HandleStateChange;
+        }
+    }
+
+    private void HandleStateChange(GameState state)
+    {
+        // ★ 기획: 아침 교대(MorningShift) 또는 중간 배송(MidDelivery) 때만 화물 생성
+        if (state == GameState.MorningShift || state == GameState.MidDelivery)
+        {
+            _isSpawning = true;
+            _timer = 0; // 상태가 바뀌면 타이머 초기화 (선택 사항)
+            // Debug.Log("화물 스폰 시작!");
+        }
+        else
+        {
+            _isSpawning = false;
+            // Debug.Log("화물 스폰 중지.");
+        }
+    }
 
     private void Update()
     {
-        // 게임이 진행 중일 때만 스폰 타이머 작동
-        if (GameTimeManager.Instance.currentState == GameState.Playing)
+        // 스폰 활성화 상태일 때만 타이머 작동
+        if (_isSpawning)
         {
             _timer += Time.deltaTime;
 
@@ -37,6 +73,8 @@ public class CargoSpawner : MonoBehaviour
     // 좌우 양쪽에서 물류 동시 생성
     void SpawnWave()
     {
+        if (GridManager.Instance == null) return;
+
         int gridYCenter = GridManager.Instance.gridSize.y / 2;
         int halfHeight = spawnHeight / 2;
 
@@ -134,8 +172,6 @@ public class CargoSpawner : MonoBehaviour
             {
                 property.SetData(randomItem);
             }
-
-            // (참고: Cargo.cs의 Start() 혹은 InitializeCargo()가 실행되면서 GridManager에 자동 등록됨)
         }
     }
 }

@@ -137,8 +137,12 @@ public class CargoProperty : CargoTrait
 
     private void CalculateFreshnessChange()
     {
+        if (IsInSafeZone())
+        {
+            return;
+        }
+
         float changeAmount = 0f;
-        float decayBase = 1.0f; // 기본 감소량
 
         Weather weather = GameTimeManager.Instance.currentWeather;
 
@@ -167,7 +171,7 @@ public class CargoProperty : CargoTrait
                 multiplier += 1.0f;
             }
 
-            changeAmount -= (decayBase * multiplier);
+            changeAmount -= (_decayAmount * multiplier);
         }
 
         // --- [증가(회복/과냉각) 로직] ---
@@ -176,13 +180,38 @@ public class CargoProperty : CargoTrait
 
         if ((isColdWave || _isNearCold) && (StorageType == StorageType.Refrigerated || StorageType == StorageType.Liquid))
         {
-            // 한파거나 냉동 옆이면 신선도 증가
-            changeAmount += 2.0f;
+            float recoveryMultiplier = 2.0f;
+
+            changeAmount += (_decayAmount * recoveryMultiplier);
         }
 
         // --- [최종 적용] ---
         if (testBool) Debug.Log(changeAmount);
         ApplyFreshness(changeAmount);
+    }
+
+    private bool IsInSafeZone()
+    {
+        if (GridManager.Instance == null || _cargo == null) return false;
+
+        Vector2Int pos = _cargo.CurrentGridPos;
+        Vector2Int gridSize = GridManager.Instance.gridSize;
+
+        // [삭제됨] X축(양쪽 끝) 체크 로직을 삭제했습니다.
+        // bool isEdgeX = (pos.x == 0 || pos.x == gridSize.x - 1);
+        // if (!isEdgeX) return false;
+
+        // 2. Y축 체크: 중앙을 기준으로 세로 5칸 범위 안에 있는가?
+        int centerY = gridSize.y / 2;
+        int range = 2; // 5칸 (중앙 ±2)
+
+        // 이제 X축 상관없이, 높이(Y)만 범위 내라면 무조건 안전지대입니다.
+        if (pos.y >= centerY - range && pos.y <= centerY + range)
+        {
+            return true;
+        }
+
+        return false;
     }
 
     private void ApplyFreshness(float amount)

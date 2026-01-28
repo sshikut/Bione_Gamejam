@@ -169,5 +169,5 @@ MonoBehaviour:
   freezingStack: 0
   _isNearHeat: 0
   _isNearCold: 0
-  _decayAmount: 1
+  _decayAmount: 0.1
   testBool: 0

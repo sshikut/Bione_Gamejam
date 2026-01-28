@@ -4,7 +4,14 @@ using System;
 public enum GameState
 {
     Preparation, // 시작 전 대기 (버튼 누르면 시작)
-    Playing,     // 게임 진행 중 (타이머 작동)
+    // Playing,     // 게임 진행 중 (타이머 작동)
+
+    MorningShift,   // 아침 교대 (3:30) - 물류 정리
+    DayService,     // 낮 서비스 (2:00) - 손님 등장
+    MidDelivery,    // 중간 배송 (2:30) - 2차 물류 & 밤 전환
+    NightService,   // 밤 서비스 (2:00) - 손님 재등장
+    NightShift,     // 저녁 교대 (3:30) - 마무리 정리
+
     DayEnded,    // 하루 종료 (정산 창)
     GameClear,   // 14일 완주
     GameOver     // 중간 파산 등
@@ -25,120 +32,204 @@ public class GameTimeManager : MonoBehaviour
     [Header("Environment")]
     public Weather currentWeather = Weather.Normal;
 
-    [Header("Settings")]
-    public int maxDays = 14;          // 총 14일
-    public float minutesPerDay = 3f;  // 하루 = 3분 (조절 가능)
+    [Header("Game Settings")]
+    public int maxDays = 14;
     public float tickInterval = 1.0f;
 
-    [Header("Current Status (Read Only)")]
+    [Header("Phase Durations (Seconds)")]
+    // 기획서에 따른 시간 설정
+    public float morningDuration = 210f; // 3분 30초
+    public float dayServiceDuration = 120f; // 2분
+    public float midDeliveryDuration = 150f; // 2분 30초
+    public float nightServiceDuration = 120f; // 2분
+    public float nightShiftDuration = 210f; // 3분 30초
+
+    [Header("Current Status")]
     public int currentDay = 1;
-    public float currentDayTimeLeft;  // 남은 시간 (초)
+    public float currentPhaseTimer; // 현재 단계의 남은 시간
     public GameState currentState = GameState.Preparation;
+    public bool isNightMode = false;
 
-    // ★ 외부 시스템(스포너, UI)이 구독할 이벤트들
-    public event Action<int> OnDayStart; // 인자: 시작된 날짜
-    public event Action OnDayEnd;
+    // --- [이벤트] ---
+    // 상태가 바뀔 때마다 알림 (UI 갱신, 스포너 작동 등에 사용)
+    public event Action<GameState> OnStateChanged;
+    public event Action OnNightThemeStart; // 밤 테마 전환용
+    public event Action OnMorningThemeStart; // 아침 테마 복귀용
+    public event Action<int> OnDayEnded; // 정산용
     public event Action OnGameClear;
-
     public event Action OnTickEvent;
 
-    private float _timer;
+    private float _tickTimer;
+    private bool _hasSwitchedToNight = false;
+
+    // ★ 현재 게임이 진행 중인지 확인하는 프로퍼티 (5단계 중 하나라면 true)
+    public bool IsPlaying
+    {
+        get
+        {
+            return currentState == GameState.MorningShift ||
+                   currentState == GameState.DayService ||
+                   currentState == GameState.MidDelivery ||
+                   currentState == GameState.NightService ||
+                   currentState == GameState.NightShift;
+        }
+    }
 
     private void Awake()
     {
-        if (Instance == null) Instance = this;
+        if (Instance == null) { Instance = this; DontDestroyOnLoad(gameObject); }
         else Destroy(gameObject);
     }
 
     private void Start()
     {
-        // 첫날 초기화
         currentDay = 1;
-        currentState = GameState.Preparation;
-
-        // (테스트용) 게임 시작하자마자 바로 Day 1 시작하고 싶으면 주석 해제
-        // StartDay(); 
+        ChangeState(GameState.Preparation);
     }
 
     private void Update()
     {
-        // 게임 진행 중일 때만 시간 흐름
-        if (currentState == GameState.Playing)
+        // 진행 중인 상태가 아니면 타이머 멈춤
+        if (!IsPlaying) return;
+
+        float deltaTime = Time.deltaTime;
+
+        // 1. 단계별 타이머 감소
+        currentPhaseTimer -= deltaTime;
+
+        // 2. 틱 이벤트 (신선도 등)
+        _tickTimer += deltaTime;
+        if (_tickTimer >= tickInterval)
         {
-            currentDayTimeLeft -= Time.deltaTime;
+            _tickTimer = 0;
+            OnTickEvent?.Invoke();
+        }
 
-            if (currentDayTimeLeft <= 0)
+        // 3. ★ 중간 배송(MidDelivery) 중 밤 테마 전환 체크
+        if (currentState == GameState.MidDelivery && !_hasSwitchedToNight)
+        {
+            // 시간이 절반 이하로 떨어지면 밤 모드 발동
+            if (currentPhaseTimer <= (midDeliveryDuration / 2f))
             {
-                EndDay();
+                TriggerNightTheme();
             }
+        }
 
-            // 신선도 감소 로직, tickInterval 마다 감소
-            _timer += Time.deltaTime;
-
-            if (_timer >= tickInterval)
-            {
-                _timer = 0;
-                OnTickEvent?.Invoke();
-            }
+        // 4. 시간이 다 되면 다음 단계로
+        if (currentPhaseTimer <= 0)
+        {
+            NextPhase();
         }
     }
 
-    // --- [공용 함수들] ---
+    // --- [로직 제어] ---
 
-    // 1. 하루 시작 (UI 버튼 등에 연결)
-    public void StartDay()
+    // 게임 시작 (UI 버튼)
+    public void StartGame()
     {
-        if (currentState == GameState.Playing) return; // 이미 진행 중이면 무시
-
-        currentDayTimeLeft = minutesPerDay * 60f; // 분 -> 초 변환
-        currentState = GameState.Playing;
-
-        Debug.Log($"=== Day {currentDay} Start ===");
-
-        // 구독자들에게 알림 (스포너야 일해라!, UI야 시간 띄워라!)
-        OnDayStart?.Invoke(currentDay);
+        currentDay = 1;
+        isNightMode = false;
+        ChangeState(GameState.MorningShift); // 첫 단계 시작
     }
 
-    // 2. 하루 종료 (시간 다 됨)
-    private void EndDay()
+    // 단계 전환 로직 (자동 호출)
+    private void NextPhase()
     {
-        currentState = GameState.DayEnded;
-        currentDayTimeLeft = 0;
-
-        Debug.Log($"=== Day {currentDay} Ended ===");
-        OnDayEnd?.Invoke(); // 정산 UI 띄우기 등
-
-        // (선택) 여기서 바로 다음 날로 넘길지, 정산 창에서 '다음 날' 버튼을 누르게 할지 결정
-        // 일단은 자동 진행이 아니라, 정산 창에서 NextDay()를 호출한다고 가정합니다.
+        switch (currentState)
+        {
+            case GameState.MorningShift:
+                ChangeState(GameState.DayService);
+                break;
+            case GameState.DayService:
+                ChangeState(GameState.MidDelivery);
+                break;
+            case GameState.MidDelivery:
+                ChangeState(GameState.NightService);
+                break;
+            case GameState.NightService:
+                ChangeState(GameState.NightShift);
+                break;
+            case GameState.NightShift:
+                FinishDay(); // 하루 끝
+                break;
+        }
     }
 
-    // 3. 다음 날로 넘어가기 (정산 창의 'Next' 버튼)
+    // 상태 변경 및 시간 설정 (핵심 함수)
+    private void ChangeState(GameState newState)
+    {
+        currentState = newState;
+
+        // 각 상태별 시간 세팅
+        switch (newState)
+        {
+            case GameState.MorningShift: currentPhaseTimer = morningDuration; break;
+            case GameState.DayService: currentPhaseTimer = dayServiceDuration; break;
+            case GameState.MidDelivery:
+                currentPhaseTimer = midDeliveryDuration;
+                _hasSwitchedToNight = false; // 플래그 초기화
+                break;
+            case GameState.NightService: currentPhaseTimer = nightServiceDuration; break;
+            case GameState.NightShift: currentPhaseTimer = nightShiftDuration; break;
+        }
+
+        Debug.Log($"상태 변경: {newState} (Day {currentDay})");
+        OnStateChanged?.Invoke(newState); // 구독자들에게 알림
+    }
+
+    // 하루 종료 처리
+    private void FinishDay()
+    {
+        ChangeState(GameState.DayEnded);
+        OnDayEnded?.Invoke(currentDay); // 정산창 띄우기
+    }
+
+    // 다음 날 시작 (정산창 Next 버튼)
     public void ProceedToNextDay()
     {
         if (currentDay < maxDays)
         {
             currentDay++;
-            currentState = GameState.Preparation;
 
-            // 바로 시작할지, 준비 단계에서 멈출지 결정 (여기선 바로 시작 예시)
-            StartDay();
+            // 아침 테마로 복귀
+            isNightMode = false;
+            OnMorningThemeStart?.Invoke();
+
+            // 바로 다음 날 아침 시작
+            ChangeState(GameState.MorningShift);
         }
         else
         {
-            // 14일 끝!
-            currentState = GameState.GameClear;
-            Debug.Log("Game Clear! 14일 생존 성공!");
+            ChangeState(GameState.GameClear);
             OnGameClear?.Invoke();
         }
     }
 
-    // UI 표시용 포맷팅 함수 (남은 시간 02:30 처럼 표시)
+    private void TriggerNightTheme()
+    {
+        _hasSwitchedToNight = true;
+        isNightMode = true;
+        Debug.Log("테마 변경: 밤");
+        OnNightThemeStart?.Invoke();
+    }
+
+    // UI용 시간 포맷터
     public string GetFormattedTime()
     {
-        if (currentState != GameState.Playing) return "00:00";
+        if (!IsPlaying) return "00:00";
+        int m = Mathf.FloorToInt(currentPhaseTimer / 60F);
+        int s = Mathf.FloorToInt(currentPhaseTimer % 60F);
+        return string.Format("{0:00}:{1:00}", m, s);
+    }
 
-        int minutes = Mathf.FloorToInt(currentDayTimeLeft / 60F);
-        int seconds = Mathf.FloorToInt(currentDayTimeLeft % 60F);
-        return string.Format("{0:00}:{1:00}", minutes, seconds);
+    public void SkipPhase() // Test
+    {
+        // 게임 진행 중이 아니면 무시 (준비 화면이나 정산 창에서는 작동 X)
+        if (!IsPlaying) return;
+
+        Debug.Log("[Console] 단계를 강제로 건너뜁니다!");
+
+        // private이었던 NextPhase를 내부에서 호출
+        NextPhase();
     }
 }
