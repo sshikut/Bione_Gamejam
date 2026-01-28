@@ -1,5 +1,7 @@
 using UnityEngine;
 using System.Collections;
+using System.Collections.Generic;
+using System.Linq;
 
 public class CustomerManager : MonoBehaviour
 {
@@ -7,7 +9,7 @@ public class CustomerManager : MonoBehaviour
 
     [Header("Assets")]
     public GameObject customerPrefab; // 손님 프리팹 (껍데기)
-    public ItemData[] menu;           // 주문 가능한 아이템 목록
+    public List<ItemData> menu;           // 주문 가능한 아이템 목록
 
     [Header("Customer Data (ScriptableObjects)")]
     public CustomerData[] generalDataList; // 일반 손님 데이터들 (Type: General)
@@ -34,6 +36,7 @@ public class CustomerManager : MonoBehaviour
     private void Awake()
     {
         Instance = this;
+        LoadItemDataAuto();
     }
 
     private void Start()
@@ -42,6 +45,18 @@ public class CustomerManager : MonoBehaviour
         {
             // GameTimeManager.Instance.OnDayStart += HandleDayStart;
         }
+    }
+
+    void LoadItemDataAuto()
+    {
+        // 1. Resources/Items 폴더 안의 모든 ItemData를 불러옴
+        // ("Items"는 Resources 폴더 안의 하위 폴더 이름입니다. 본인 폴더명에 맞게 수정하세요)
+        ItemData[] loadedData = Resources.LoadAll<ItemData>("ItemData");
+
+        // 2. 리스트에 덮어쓰기
+        menu = loadedData.ToList();
+
+        Debug.Log($"[System] 메뉴에 {menu.Count}개 자동 로드 완료!");
     }
 
     private void HandleDayStart(int day)
@@ -131,7 +146,7 @@ public class CustomerManager : MonoBehaviour
         Customer customer = obj.GetComponent<Customer>();
 
         // 4. 메뉴 선정
-        ItemData item = menu[Random.Range(0, menu.Length)];
+        ItemData item = menu[Random.Range(0, menu.Count)];
         int count = Random.Range(1, 4);
 
         // 5. 초기화 (데이터 주입)

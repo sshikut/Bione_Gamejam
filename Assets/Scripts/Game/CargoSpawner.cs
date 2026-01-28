@@ -1,5 +1,7 @@
 using UnityEngine;
 using System.Collections;
+using System.Linq;
+using System.Collections.Generic;
 
 public class CargoSpawner : MonoBehaviour
 {
@@ -8,7 +10,7 @@ public class CargoSpawner : MonoBehaviour
     public GameObject baseCargoPrefab;
 
     [Tooltip("생성 가능한 화물 데이터 목록")]
-    public ItemData[] spawnableItems;
+    public List<ItemData> spawnableItems;
 
     [Tooltip("스폰 주기 (초)")]
     public float spawnInterval = 5.0f;
@@ -18,6 +20,11 @@ public class CargoSpawner : MonoBehaviour
 
     private float _timer;
     private bool _isSpawning = false; // 현재 스폰 중인가?
+
+    private void Awake()
+    {
+        LoadItemDataAuto();
+    }
 
     private void Start()
     {
@@ -37,6 +44,18 @@ public class CargoSpawner : MonoBehaviour
         {
             GameTimeManager.Instance.OnStateChanged -= HandleStateChange;
         }
+    }
+
+    void LoadItemDataAuto()
+    {
+        // 1. Resources/Items 폴더 안의 모든 ItemData를 불러옴
+        // ("Items"는 Resources 폴더 안의 하위 폴더 이름입니다. 본인 폴더명에 맞게 수정하세요)
+        ItemData[] loadedData = Resources.LoadAll<ItemData>("ItemData");
+
+        // 2. 리스트에 덮어쓰기
+        spawnableItems = loadedData.ToList();
+
+        Debug.Log($"[System] 아이템 데이터 {spawnableItems.Count}개 자동 로드 완료!");
     }
 
     private void HandleStateChange(GameState state)
@@ -157,10 +176,10 @@ public class CargoSpawner : MonoBehaviour
         }
 
         // 3. [생성] 입구가 확보되었으므로 새 화물 생성
-        if (spawnableItems.Length > 0 && baseCargoPrefab != null)
+        if (spawnableItems.Count > 0 && baseCargoPrefab != null)
         {
             // 랜덤 데이터 뽑기
-            ItemData randomItem = spawnableItems[Random.Range(0, spawnableItems.Length)];
+            ItemData randomItem = spawnableItems[Random.Range(0, spawnableItems.Count)];
 
             // 프리팹 생성 및 위치 잡기
             GameObject newObj = Instantiate(baseCargoPrefab);

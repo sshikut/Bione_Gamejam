@@ -1608,12 +1608,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   customerPrefab: {fileID: 2530801951976287212, guid: 4bb8b72579a254d4cbd5db7f54caa640, type: 3}
-  menu:
-  - {fileID: 11400000, guid: bb2cfd2bb0c85b84c8eb2db0a231951b, type: 2}
-  - {fileID: 11400000, guid: 4a83fa46bfee86546ba4ed401daaa634, type: 2}
-  - {fileID: 11400000, guid: f665cdc2880cc04459e5014a266a4533, type: 2}
-  - {fileID: 11400000, guid: c80cef2339136c749a409a6deac85331, type: 2}
-  - {fileID: 11400000, guid: 3432c44858882ae439bfb14b05f8d09f, type: 2}
+  menu: []
   generalDataList:
   - {fileID: 11400000, guid: fdc3f96a85073fa438ac07e043c3f743, type: 2}
   - {fileID: 11400000, guid: 4028b24278cafe6458e8e753da4e2330, type: 2}
@@ -25084,12 +25079,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   baseCargoPrefab: {fileID: 8003066731534554604, guid: be491d22367afd249893c9d6326b126c, type: 3}
-  spawnableItems:
-  - {fileID: 11400000, guid: bb2cfd2bb0c85b84c8eb2db0a231951b, type: 2}
-  - {fileID: 11400000, guid: 4a83fa46bfee86546ba4ed401daaa634, type: 2}
-  - {fileID: 11400000, guid: f665cdc2880cc04459e5014a266a4533, type: 2}
-  - {fileID: 11400000, guid: c80cef2339136c749a409a6deac85331, type: 2}
-  - {fileID: 11400000, guid: 3432c44858882ae439bfb14b05f8d09f, type: 2}
+  spawnableItems: []
   spawnInterval: 5
   spawnHeight: 5
 --- !u!1660057539 &9223372036854775807
