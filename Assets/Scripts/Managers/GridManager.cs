@@ -11,10 +11,20 @@ public class GridManager : MonoBehaviour
 
     private Dictionary<Vector2Int, Cargo> _gridContents = new Dictionary<Vector2Int, Cargo>();
 
+    private HashSet<Vector2Int> _noDropZones = new HashSet<Vector2Int>();
+
+    private HashSet<Vector2Int> _dangerZones = new HashSet<Vector2Int>();
+
     private void Awake()
     {
         if (Instance == null) Instance = this;
         else Destroy(gameObject);
+    }
+
+    private void Start()
+    {
+        SetConveyorBeltZone();
+        SetDangerZone();
     }
 
     // ★ [핵심] 그리드의 "물리적 왼쪽 아래 좌표"를 계산하는 함수
@@ -62,15 +72,37 @@ public class GridManager : MonoBehaviour
 
     // 장부 관련 함수들 (기존 유지)
     public bool IsOccupied(Vector2Int gridPos) => _gridContents.ContainsKey(gridPos);
+
     public Cargo GetCargoAt(Vector2Int gridPos) => _gridContents.TryGetValue(gridPos, out Cargo c) ? c : null;
+
     public void RegisterCargo(Vector2Int gridPos, Cargo cargo)
     {
+        // 1. 딕셔너리에 화물 등록 (기존 로직 유지)
         if (!_gridContents.ContainsKey(gridPos))
         {
             _gridContents.Add(gridPos, cargo);
             cargo.CurrentGridPos = gridPos;
         }
+        else
+        {
+            // (안전장치) 만약 이미 키가 있다면 덮어씌워서 위치 갱신 확실하게 함
+            _gridContents[gridPos] = cargo;
+            cargo.CurrentGridPos = gridPos;
+        }
+
+        // 2. [추가된 핵심 로직] 등록된 위치가 '위험 구역'인지 체크 -> 게임 오버!
+        if (_dangerZones.Contains(gridPos))
+        {
+            Debug.Log($"화물({cargo.name})이 위험 구역 {gridPos}에 진입! GAME OVER");
+
+            if (GameTimeManager.Instance != null)
+            {
+                // 화물 소각 사유로 게임 오버 트리거
+                GameTimeManager.Instance.TriggerGameOver(GameOverReason.CargoBurned);
+            }
+        }
     }
+
     public void UnregisterCargo(Vector2Int gridPos) { if (_gridContents.ContainsKey(gridPos)) _gridContents.Remove(gridPos); }
 
     // 기즈모 그리기 (중앙 정렬에 맞춰 수정됨)
@@ -97,5 +129,52 @@ public class GridManager : MonoBehaviour
         // (선택) 그리드 매니저 위치(중앙) 표시
         Gizmos.color = Color.red;
         Gizmos.DrawSphere(transform.position, 0.2f);
+    }
+
+    private void SetConveyorBeltZone()
+    {
+        // 맵의 정중앙 Y 좌표 구하기
+        int centerY = gridSize.y / 2;
+
+        // 중앙 기준 위아래 2칸씩 (총 5칸: -2, -1, 0, +1, +2)
+        int range = 2;
+
+        for (int x = 0; x < gridSize.x; x++)
+        {
+            for (int y = centerY - range; y <= centerY + range; y++)
+            {
+                Vector2Int pos = new Vector2Int(x, y);
+
+                // 금지 구역 리스트에 추가
+                _noDropZones.Add(pos);
+            }
+        }
+
+        Debug.Log($"배치 금지 구역 설정 완료: {_noDropZones.Count}칸");
+    }
+
+    public bool IsDropAllowed(Vector2Int pos)
+    {
+        // 금지 구역 리스트에 포함되어 있다면 false (놓기 금지)
+        if (_noDropZones.Contains(pos))
+        {
+            return false;
+        }
+
+        return true; // 포함 안 되어 있으면 true (놓기 가능)
+    }
+
+    private void SetDangerZone()
+    {
+        int centerX = gridSize.x / 2; // 가로 중앙
+        int centerY = gridSize.y / 2; // 세로 중앙
+        int range = 2; // 중앙 기준 위아래 2칸 (총 5칸)
+
+        // 불은 맵의 정중앙 세로줄에만 있음
+        for (int y = centerY - range; y <= centerY + range; y++)
+        {
+            Vector2Int pos = new Vector2Int(centerX, y);
+            _dangerZones.Add(pos);
+        }
     }
 }

@@ -4,6 +4,7 @@ public class Cargo : MonoBehaviour
 {
     [Header("Status")]
     public Vector2Int CurrentGridPos; // 현재 내가 있는 그리드 좌표
+    public bool isHeld = false;
 
     [Header("Settings")]
     [SerializeField] private float _moveSpeed = 15f;
@@ -54,6 +55,20 @@ public class Cargo : MonoBehaviour
         }
     }
 
+    public ItemData data
+    {
+        get
+        {
+            // 내 오브젝트에 붙어있는 CargoProperty를 찾아서 data를 리턴
+            CargoProperty property = GetComponent<CargoProperty>();
+            if (property != null)
+            {
+                return property.data;
+            }
+            return null; // 데이터가 없으면 null
+        }
+    }
+
     // --- [상호작용 함수들] ---
 
     // 플레이어가 이 화물을 집었을 때 호출
@@ -71,6 +86,8 @@ public class Cargo : MonoBehaviour
 
         // 3. ★ 중요: 플레이어의 밀기 기능(PlayerPush)을 빌려옴 (대리 밀기용)
         _ownerPushScript = playerTransform.GetComponent<PlayerPush>();
+
+        isHeld = true;
     }
 
     // 플레이어가 이 화물을 내려놓았을 때 호출
@@ -91,6 +108,8 @@ public class Cargo : MonoBehaviour
 
         // 4. ★ 중요: 주인님 정보 초기화
         _ownerPushScript = null;
+
+        isHeld = false;
     }
 
     // 외부(PlayerPush)에서 이 화물을 밀 때 호출

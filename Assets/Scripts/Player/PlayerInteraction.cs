@@ -31,6 +31,25 @@ public class PlayerInteraction : MonoBehaviour
         }
     }
 
+    public List<Cargo> GetHoldingCargos()
+    {
+        return _holdingCargos;
+    }
+
+    public void OnItemSold(Cargo soldCargo)
+    {
+        if (_holdingCargos.Contains(soldCargo))
+        {
+            // 1. 리스트에서 제거 (장부 지우기)
+            _holdingCargos.Remove(soldCargo);
+
+            // 2. 실제 오브젝트 파괴
+            Destroy(soldCargo.gameObject);
+
+            Debug.Log("플레이어: 물건 판매 완료! (리스트에서 제거됨)");
+        }
+    }
+
     // 마우스 클릭 처리
     void HandleMouseClick()
     {
@@ -84,17 +103,22 @@ public class PlayerInteraction : MonoBehaviour
     // 특정 화물 하나만 놓기
     void DropSpecificCargo(Cargo cargo)
     {
-        // 현재 화물이 떠 있는 위치의 그리드 좌표 계산
+        // 현재 화물 위치의 그리드 좌표
         Vector2Int currentGridPos = GridManager.Instance.WorldToGrid(cargo.transform.position);
 
-        // 놓을 수 있는 땅인지 확인
+        // 내려놓기 가능 조건 검사:
+        // 1. 그리드 범위 내인가? (IsValidGridPosition)
+        // 2. 이미 다른 화물이 있지 않은가? (!IsOccupied)
+        // 3. ★ [추가] 금지 구역(컨베이어 벨트)이 아닌가? (IsDropAllowed)
         if (GridManager.Instance.IsValidGridPosition(currentGridPos) &&
-            !GridManager.Instance.IsOccupied(currentGridPos))
+            !GridManager.Instance.IsOccupied(currentGridPos) &&
+            GridManager.Instance.IsDropAllowed(currentGridPos))  // <--- 이 조건 추가!
         {
+            // --- [성공 로직] ---
             // 리스트에서 제거
             _holdingCargos.Remove(cargo);
 
-            // 내려놓기 명령
+            // 내려놓기 (위치 스냅)
             Vector3 snapPos = GridManager.Instance.GridToWorldCenter(currentGridPos);
             cargo.OnDropped(snapPos, currentGridPos, _playerCollider);
 
@@ -103,7 +127,9 @@ public class PlayerInteraction : MonoBehaviour
         }
         else
         {
-            Debug.Log("여기에 내려놓을 수 없습니다 (벽이거나 다른 화물 위)");
+            // --- [실패 로직] ---
+            // 여기에 걸리면 리스트에서 제거되지 않으므로 계속 들고 있게 됨
+            Debug.Log("이곳에는 내려놓을 수 없습니다. (금지 구역 혹은 이미 있음)");
         }
     }
 

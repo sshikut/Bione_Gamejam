@@ -25,6 +25,12 @@ public enum Weather
     ColdWave    // 한파
 }
 
+public enum GameOverReason
+{
+    Bankruptcy, // 파산
+    CargoBurned // 화물 소각 (데드존)
+}
+
 public class GameTimeManager : MonoBehaviour
 {
     public static GameTimeManager Instance;
@@ -231,5 +237,21 @@ public class GameTimeManager : MonoBehaviour
 
         // private이었던 NextPhase를 내부에서 호출
         NextPhase();
+    }
+
+    public void TriggerGameOver(GameOverReason reason)
+    {
+        if (currentState == GameState.GameOver) return; // 이미 끝났으면 패스
+
+        Debug.Log($"게임 오버 발생 사유: {reason}");
+
+        // 상태 변경
+        ChangeState(GameState.GameOver);
+
+        // (선택) 화물 소각으로 인한 게임 오버라면 시간을 멈추거나 특수 연출 가능
+        if (reason == GameOverReason.CargoBurned)
+        {
+            Time.timeScale = 0; // 게임 일시 정지 (긴박감!)
+        }
     }
 }

@@ -8,6 +8,7 @@ public class GameUIManager : MonoBehaviour
     public TextMeshProUGUI dayText;       // "Day 1"
     public TextMeshProUGUI timeText;      // "02:59"
     public TextMeshProUGUI phaseText;     // "아침 교대", "낮 영업 중" 등 상태 표시
+    public TextMeshProUGUI moneyText;
 
     [Header("UI References (Panels)")]
     public GameObject resultPanel;        // 정산 창 (하루 종료 시)
@@ -30,6 +31,14 @@ public class GameUIManager : MonoBehaviour
             // ★ 시작하자마자 현재 상태에 맞춰 UI 한 번 갱신
             HandleStateChange(GameTimeManager.Instance.currentState);
             UpdateDayText(GameTimeManager.Instance.currentDay);
+        }
+
+        if (MoneyManager.Instance != null)
+        {
+            MoneyManager.Instance.OnBionChanged += UpdateMoneyUI;
+
+            // 초기값 표시
+            UpdateMoneyUI(MoneyManager.Instance.currentBion);
         }
 
         // 패널 초기화 (꺼두기)
@@ -132,6 +141,14 @@ public class GameUIManager : MonoBehaviour
     void UpdateDayText(int day)
     {
         dayText.text = $"Day {day}";
+    }
+
+    private void UpdateMoneyUI(int amount)
+    {
+        if (moneyText != null)
+        {
+            moneyText.text = $"{amount:N0} <color=#00FFFF>B</color>";
+        }
     }
 
     // Enum을 한글로 예쁘게 변환해주는 함수
