@@ -100,6 +100,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   CurrentGridPos: {x: 0, y: 0}
+  isHeld: 0
   _moveSpeed: 15
 --- !u!61 &9127726763055508265
 BoxCollider2D:
@@ -169,5 +170,5 @@ MonoBehaviour:
   freezingStack: 0
   _isNearHeat: 0
   _isNearCold: 0
-  _decayAmount: 0.1
+  _decayAmount: 1
   testBool: 0

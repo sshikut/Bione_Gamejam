@@ -1,11 +1,5 @@
 using UnityEngine;
 
-public enum CustomerType
-{
-    General,
-    Pickup
-}
-
 [CreateAssetMenu(fileName = "Data_NewCustomer", menuName = "Game/Customer Data")]
 public class CustomerData : ScriptableObject
 {

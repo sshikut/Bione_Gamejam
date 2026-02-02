@@ -34,39 +34,4 @@ public static class CargoInteractionLogic
         if (prop == null) return false;
         return prop.StorageType == StorageType.Frozen;
     }
-
-    public static float GetWeatherDecayMultiplier(Weather weather, StorageType type, bool isProtectedByCold)
-    {
-        // 1. 폭염: 냉기 보호 못 받는 냉동/냉장/액상은 3배 빨리 썩음
-        if (weather == Weather.HeatWave)
-        {
-            if (!isProtectedByCold && (type == StorageType.Frozen || type == StorageType.Refrigerated || type == StorageType.Liquid))
-            {
-                return 3.0f;
-            }
-        }
-
-        // 2. 한파: (질문하신 대로) 냉장/액상의 신선도가 빠르게 증가(회복/과냉각)
-        // 이건 감소 배율이 아니라 회복 로직에서 처리해야 하므로 여기선 패스하거나 음수 반환 가능
-
-        return 1.0f; // 기본 배율
-    }
-
-    public static bool CheckRainySeasonPenalty(Cargo myCargo)
-    {
-        // 상하좌우 4면 검사
-        Vector2Int[] dirs = { Vector2Int.up, Vector2Int.down, Vector2Int.left, Vector2Int.right };
-        int blockedSides = 0;
-
-        foreach (var dir in dirs)
-        {
-            if (GridManager.Instance.IsOccupied(myCargo.CurrentGridPos + dir))
-            {
-                blockedSides++;
-            }
-        }
-
-        // 4면이 다 막혀있으면 패널티 대상
-        return blockedSides == 4;
-    }
 }

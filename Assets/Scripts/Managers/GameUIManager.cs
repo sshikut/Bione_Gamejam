@@ -9,6 +9,7 @@ public class GameUIManager : MonoBehaviour
     public TextMeshProUGUI timeText;      // "02:59"
     public TextMeshProUGUI phaseText;     // "아침 교대", "낮 영업 중" 등 상태 표시
     public TextMeshProUGUI moneyText;
+    public TextMeshProUGUI weatherText;
 
     [Header("UI References (Panels)")]
     public GameObject resultPanel;        // 정산 창 (하루 종료 시)
@@ -39,6 +40,12 @@ public class GameUIManager : MonoBehaviour
 
             // 초기값 표시
             UpdateMoneyUI(MoneyManager.Instance.currentBion);
+        }
+
+        // 날씨 UI
+        if (WeatherManager.Instance != null)
+        {
+            WeatherManager.Instance.OnWeatherChanged += UpdateWeatherUI;
         }
 
         // 패널 초기화 (꺼두기)
@@ -167,5 +174,13 @@ public class GameUIManager : MonoBehaviour
             case GameState.GameOver: return "파산...";
             default: return "";
         }
+    }
+
+    // 날씨
+    private void UpdateWeatherUI(WeatherEffectSO newWeather)
+    {
+        if (newWeather == null) return;
+
+        if (weatherText != null) weatherText.text = newWeather.weatherName;
     }
 }

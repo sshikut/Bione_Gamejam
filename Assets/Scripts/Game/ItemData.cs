@@ -1,29 +1,5 @@
 using UnityEngine;
 
-public enum StorageType
-{
-    RoomTemp,     // 실온 (기본, 일반 물건)
-    Refrigerated, // 냉장
-    Frozen,       // 냉동
-    Heated,       // 온장
-    Liquid        // 액상
-}
-
-public enum ItemCategory
-{
-    General, // 일반 (날씨 영향 X)
-    Food     // 식품 (장마철 밀집 패널티 등 적용)
-}
-
-public enum CargoState
-{
-    Normal,     // 정상
-    Wet,        // 젖음 (냉동이 녹아서 터짐)
-    Spoiled,    // 상함 (악취 풍김)
-    HeatedState, // 가열됨 (액상이 끓어서 열기 발산)
-    FrozenBurst
-}
-
 // 프로젝트 창에서 우클릭 -> Create -> Game -> ItemData 로 파일을 만들 수 있게 함
 [CreateAssetMenu(fileName = "New Item", menuName = "Game/ItemData")]
 public class ItemData : ScriptableObject
@@ -46,10 +22,10 @@ public class ItemData : ScriptableObject
         {
             case StorageType.Refrigerated:
             case StorageType.Liquid:
-            case StorageType.Frozen:
                 maxFreshness = 101;
                 break;
 
+            case StorageType.Frozen:
             case StorageType.RoomTemp:
             case StorageType.Heated:
                 maxFreshness = 100; // 기본값

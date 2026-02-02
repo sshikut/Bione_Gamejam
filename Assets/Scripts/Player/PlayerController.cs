@@ -37,7 +37,6 @@ public class PlayerController : MonoBehaviour
             if (gridPos != _currentGridPos)
             {
                 _currentGridPos = gridPos;
-                Debug.Log($"현재 위치: {_currentGridPos}"); 
             }
         }
     }

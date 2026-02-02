@@ -1,42 +1,9 @@
 using UnityEngine;
 using System;
 
-public enum GameState
-{
-    Preparation, // 시작 전 대기 (버튼 누르면 시작)
-    // Playing,     // 게임 진행 중 (타이머 작동)
-
-    MorningShift,   // 아침 교대 (3:30) - 물류 정리
-    DayService,     // 낮 서비스 (2:00) - 손님 등장
-    MidDelivery,    // 중간 배송 (2:30) - 2차 물류 & 밤 전환
-    NightService,   // 밤 서비스 (2:00) - 손님 재등장
-    NightShift,     // 저녁 교대 (3:30) - 마무리 정리
-
-    DayEnded,    // 하루 종료 (정산 창)
-    GameClear,   // 14일 완주
-    GameOver     // 중간 파산 등
-}
-
-public enum Weather
-{
-    Normal,     // 평소
-    HeatWave,   // 폭염
-    RainySeason,// 장마
-    ColdWave    // 한파
-}
-
-public enum GameOverReason
-{
-    Bankruptcy, // 파산
-    CargoBurned // 화물 소각 (데드존)
-}
-
 public class GameTimeManager : MonoBehaviour
 {
     public static GameTimeManager Instance;
-
-    [Header("Environment")]
-    public Weather currentWeather = Weather.Normal;
 
     [Header("Game Settings")]
     public int maxDays = 14;
@@ -64,6 +31,7 @@ public class GameTimeManager : MonoBehaviour
     public event Action<int> OnDayEnded; // 정산용
     public event Action OnGameClear;
     public event Action OnTickEvent;
+    public event Action<int> OnDayChanged; // 날씨 변화용
 
     private float _tickTimer;
     private bool _hasSwitchedToNight = false;
@@ -136,6 +104,7 @@ public class GameTimeManager : MonoBehaviour
         currentDay = 1;
         isNightMode = false;
         ChangeState(GameState.MorningShift); // 첫 단계 시작
+        OnDayChanged?.Invoke(currentDay);
     }
 
     // 단계 전환 로직 (자동 호출)
@@ -203,6 +172,9 @@ public class GameTimeManager : MonoBehaviour
 
             // 바로 다음 날 아침 시작
             ChangeState(GameState.MorningShift);
+
+            Debug.Log($"{currentDay}일차 시작 알림 발송!");
+            OnDayChanged?.Invoke(currentDay);
         }
         else
         {

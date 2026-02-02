@@ -22,10 +22,12 @@ public class CargoProperty : CargoTrait
 
     private float _stenchTimer = 0f;
 
-    [SerializeField] private bool _isNearHeat; // 열기 감지
-    [SerializeField] private bool _isNearCold; // 냉기 감지
+    [SerializeField] private bool _isNearHeat;
+    public bool IsNearHeat => _isNearHeat;
 
-    // 신선도 감소량 (기획에 따라 Inspector에서 조절 혹은 ItemData로 이동 가능)
+    [SerializeField] private bool _isNearCold;
+    public bool IsNearCold => _isNearCold;
+
     [SerializeField] private float _decayAmount = 1.0f;
 
     public bool testBool = false;
@@ -95,18 +97,31 @@ public class CargoProperty : CargoTrait
     public override void OnTick()
     {
         if (_cargo == null || data == null) return;
-        // 0. 이미 상태가 변해서 기능을 상실했으면 로직 중단? 
-        // (기획에 따라 Spoiled 상태여도 악취는 풍겨야 하므로 계속 돔)
 
-        // 1. 주변 환경 스캔
-        ScanSurroundings();
+        ScanSurroundings(); // 주변 스캔
 
-        // 2. 신선도 변화 계산
-        CalculateFreshnessChange();
+        if (IsInSafeZone()) return; // 안전지대 신선도 변화 X
+
+        float weatherMultiplier = 1f;
+        if (WeatherManager.Instance != null && WeatherManager.Instance.currentWeatherEffect != null)
+        {
+            weatherMultiplier = WeatherManager.Instance.currentWeatherEffect.GetDecayMultiplier(this); // 날씨 효과 적용
+        }
+
+        float nearMultiplier = 1f;
+        if (StorageType != StorageType.Heated && IsNearHeat) nearMultiplier = 2f;
+        else if (StorageType != StorageType.Heated && IsNearCold) nearMultiplier = -1f;
+
+        // 기타 상태 처리
         CheckFreezingBurst();
-
-        // 3. 상태 이상 효과 처리 (악취 전파 등)
         HandleStateEffects();
+
+        float finalMultiplier;
+
+        if (nearMultiplier >= weatherMultiplier) finalMultiplier = nearMultiplier;
+        else finalMultiplier = weatherMultiplier;
+
+        ModifyFreshness(_decayAmount * finalMultiplier);
     }
 
     private void ScanSurroundings()
@@ -129,65 +144,10 @@ public class CargoProperty : CargoTrait
                 {
                     // 열기는 8방향, 냉기는 4방향(또는 8방향) 등 기획에 따라 조절
                     if (CargoInteractionLogic.IsHeatSource(neighborProp) && (data.storageType != StorageType.Heated)) _isNearHeat = true;
-                    if (CargoInteractionLogic.IsColdSource(neighborProp) && (data.storageType != StorageType.Frozen && data.storageType != StorageType.Heated)) _isNearCold = true;
+                    if (CargoInteractionLogic.IsColdSource(neighborProp) && (data.storageType != StorageType.Heated)) _isNearCold = true;
                 }
             }
         }
-    }
-
-    private void CalculateFreshnessChange()
-    {
-        if (IsInSafeZone())
-        {
-            return;
-        }
-
-        float changeAmount = 0f;
-
-        Weather weather = GameTimeManager.Instance.currentWeather;
-
-        // --- [감소 로직] ---
-        if (StorageType != StorageType.RoomTemp)
-        {
-            float multiplier = 1.0f;
-
-            // 1. 폭염 체크
-            multiplier *= CargoInteractionLogic.GetWeatherDecayMultiplier(weather, StorageType, _isNearCold);
-
-            // 2. 장마 체크 (식품 & 4면 밀착)
-            if (weather == Weather.RainySeason && data.category == ItemCategory.Food)
-            {
-                if (CargoInteractionLogic.CheckRainySeasonPenalty(_cargo))
-                {
-                    multiplier *= 3.0f;
-                }
-            }
-
-            // 3. 열기 효과 (주변에 온장이 있으면)
-            if (_isNearHeat)
-            {
-                // 감소량 대폭 증가? 혹은 고정 수치 감소?
-                // 예: 열기 있으면 2배 빨리 썩음
-                multiplier += 1.0f;
-            }
-
-            changeAmount -= (_decayAmount * multiplier);
-        }
-
-        // --- [증가(회복/과냉각) 로직] ---
-        // 한파 또는 냉동 주변
-        bool isColdWave = (weather == Weather.ColdWave);
-
-        if ((isColdWave || _isNearCold) && (StorageType == StorageType.Refrigerated || StorageType == StorageType.Liquid))
-        {
-            float recoveryMultiplier = 2.0f;
-
-            changeAmount += (_decayAmount * recoveryMultiplier);
-        }
-
-        // --- [최종 적용] ---
-        if (testBool) Debug.Log(changeAmount);
-        ApplyFreshness(changeAmount);
     }
 
     private bool IsInSafeZone()
@@ -214,22 +174,16 @@ public class CargoProperty : CargoTrait
         return false;
     }
 
-    private void ApplyFreshness(float amount)
+    public void ModifyFreshness(float amount)
     {
-        currentFreshness += amount;
-        
-        // 최대치 제한 (130 등)
-        if (currentFreshness > data.maxFreshness) currentFreshness = data.maxFreshness;
+        currentFreshness -= amount;
 
-        // 0 이하 도달 시 => [이벤트 트리거] 발동!
+        // 최대치/최소치 제한 및 이벤트 트리거 로직...
+        if (currentFreshness > data.maxFreshness) currentFreshness = data.maxFreshness;
         if (currentFreshness <= 0)
         {
             currentFreshness = 0;
-            if (currentState == CargoState.Normal) // 정상일 때만 트리거
-            {
-                Debug.Log("상해버림");
-                TriggerZeroFreshnessEvent();
-            }
+            if (currentState == CargoState.Normal) TriggerZeroFreshnessEvent();
         }
     }
 
@@ -282,6 +236,25 @@ public class CargoProperty : CargoTrait
     }
 
     // --- [상태별 지속 효과] ---
+    public bool CheckIfSurrounded()
+    {
+        if (_cargo == null) return false;
+
+        Vector2Int[] dirs = { Vector2Int.up, Vector2Int.down, Vector2Int.left, Vector2Int.right };
+        int blockedCount = 0;
+
+        foreach (var dir in dirs)
+        {
+            Vector2Int checkPos = _cargo.CurrentGridPos + dir;
+            // 맵 밖이거나, 다른 화물이 있으면 막힌 것으로 간주
+            if (!GridManager.Instance.IsValidGridPosition(checkPos) || GridManager.Instance.IsOccupied(checkPos))
+            {
+                blockedCount++;
+            }
+        }
+        return blockedCount == 4;
+    }
+
     private void HandleStateEffects()
     {
         // A. 내가 상했다면 -> 주변에 악취 뿌리기
@@ -431,7 +404,6 @@ public class CargoProperty : CargoTrait
 
     public void ApplyDamage(float damageAmount)
     {
-        // 피해는 음수로 처리해서 ApplyFreshness에 넘김
-        ApplyFreshness(-damageAmount);
+        ModifyFreshness(damageAmount);
     }
 }
