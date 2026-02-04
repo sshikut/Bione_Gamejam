@@ -5,132 +5,135 @@ using System.Collections;
 
 public class Customer : MonoBehaviour
 {
-    [Header("Identity (Runtime)")]
-    public CustomerType type;      // 데이터에서 받아온 타입
+    [Header("Identity")]
+    public CustomerType type;           // 손님 타입 (General / Pickup)
     public string customerName;
 
-    [Header("Order Info")]
-    public ItemData wantedItem;    // 원하는 물건
-    public int wantedCount;        // 원하는 수량
+    [Header("General Customer Info")]
+    public StorageType wantedCategory; // 일반 손님이 원하는 속성 (냉동, 실온 등)
+    private Shelf _targetShelf;            // 목표 진열대
+
+    [Header("Pickup Customer Info")]
+    public ItemData wantedItem;         // 픽업 손님이 원하는 특정 아이템
+    public int wantedCount;             // 픽업 수량
     public int currentReceivedCount = 0;
 
-    [Header("Settings")]
-    public int basePrice = 100;    // 물건 개당 기본 가격
-    public float stopDistance = 0.1f; // 이동 멈춤 거리
-
-    [Header("Components")]
-    public SpriteRenderer bodyRenderer; // 몸통 스프라이트
-
-    [Header("UI Refs")]
-    public Image itemIcon;         // 말풍선 아이콘
-    public TextMeshProUGUI countText; // 수량 텍스트
-    public Slider patienceSlider;  // 인내심 게이지
+    [Header("Visual & UI")]
+    public SpriteRenderer bodyRenderer;
+    public Image itemIcon;              // 말풍선 아이콘 (카테고리 아이콘 or 아이템 아이콘)
+    public TextMeshProUGUI countText;   // 수량 텍스트
+    public Slider patienceSlider;       // 인내심 게이지
 
     // 내부 변수
-    private float _timer;          // 남은 인내심 시간
-    private float _maxPatience;    // 최대 인내심 (슬라이더용)
-    private float _moveSpeed;      // 이동 속도
+    private float _moveSpeed;
+    private float _maxPatience;
+    private float _timer;
     private bool _isActive = false;
-
-    private Transform _targetPoint;       // 현재 이동 목표
-    private Transform[] _roamPoints;      // 일반 손님 배회 경로
-    private Transform _finalDestination;  // 최종 목적지 (카운터 or 포탈)
     private bool _isMoving = false;
 
-    // ★ 초기화: 매니저가 데이터를 꽂아줄 때 호출
-    // (CustomerProfile -> CustomerData로 변경됨)
-    public void Initialize(ItemData item, int count,
-                           Transform destination, Transform[] waypoints,
-                           CustomerData data)
-    {
-        // 1. 데이터 적용
-        if (data == null)
-        {
-            Debug.LogError("Customer: CustomerData가 없습니다!");
-            return;
-        }
+    private Transform _targetPoint;      // 현재 이동 목표점
+    private Transform[] _roamPoints;     // 산책 경로
+    private Transform _finalDestination; // 최종 목적지 (픽업용 카운터 등)
 
-        type = data.type;
+    // ==================================================================================
+    // 1. 초기화 (Initialize)
+    // ==================================================================================
+
+    // A. 일반 손님용 초기화 (진열대 쇼핑)
+    public void InitializeGeneral(StorageType category, Shelf shelf,
+                                  Transform[] waypoints, CustomerData data)
+    {
+        ApplyCommonData(data, CustomerType.General);
+
+        wantedCategory = category;
+        _targetShelf = shelf;
+        _roamPoints = waypoints;
+
+        // UI 설정 (카테고리 아이콘 설정 필요 - 여기서는 임시 처리)
+        // if (itemIcon != null) itemIcon.sprite = GetCategoryIcon(category);
+        if (countText != null) countText.text = ""; // 일반 손님은 수량 표시 안 함 (혹은 1개)
+
+        // 행동 시작
+        StartCoroutine(GeneralShoppingRoutine());
+    }
+
+    // B. 픽업 손님용 초기화 (카운터 수령)
+    public void InitializePickup(ItemData item, int count,
+                                 Transform destination, CustomerData data)
+    {
+        ApplyCommonData(data, CustomerType.Pickup);
+
+        wantedItem = item;
+        wantedCount = count;
+        _finalDestination = destination;
+
+        // UI 설정
+        if (itemIcon != null) itemIcon.sprite = item.icon;
+        UpdatePickupCountUI();
+        if (countText != null) countText.color = Color.red; // 픽업 강조
+
+        // 행동 시작 (카운터로 직행)
+        MoveTo(_finalDestination);
+    }
+
+    // 공통 데이터 적용 헬퍼
+    private void ApplyCommonData(CustomerData data, CustomerType setType)
+    {
+        type = setType;
         customerName = data.customerName;
         gameObject.name = $"Customer_{type}_{customerName}";
 
-        // 외형 및 능력치 적용
-        if (bodyRenderer != null) bodyRenderer.sprite = data.bodySprite;
+        if (bodyRenderer != null && data.bodySprite != null)
+            bodyRenderer.sprite = data.bodySprite;
 
-        // 기본값(3.0f, 60f)에 데이터 계수를 곱함
+        // 능력치 적용
         _moveSpeed = 3.0f * data.speedMultiplier;
         _maxPatience = 60f * data.patienceMultiplier;
         _timer = _maxPatience;
 
-        // 2. 주문 정보 설정
-        wantedItem = item;
-        wantedCount = count;
-        _finalDestination = destination;
-        _roamPoints = waypoints;
-        _isActive = true;
-
-        // 3. UI 갱신
-        if (itemIcon != null) itemIcon.sprite = item.icon;
         if (patienceSlider != null) patienceSlider.maxValue = _maxPatience;
-        UpdateCountUI();
 
-        // 픽업 손님 강조 (텍스트 색상 변경 등)
-        if (type == CustomerType.Pickup && countText != null)
-            countText.color = Color.red;
-
-        // 4. 행동 시작
-        if (type == CustomerType.Pickup)
-        {
-            // 픽업: 목적지(카운터)로 직행
-            MoveTo(_finalDestination);
-        }
-        else
-        {
-            // 일반: 편의점 구경(배회) 시작
-            StartCoroutine(GeneralCustomerRoutine());
-        }
+        _isActive = true;
     }
+
+    // ==================================================================================
+    // 2. 메인 루프 (Update)
+    // ==================================================================================
 
     private void Update()
     {
-        // 1. 이동 로직
+        // 이동 로직
         if (_isMoving && _targetPoint != null)
         {
             transform.position = Vector3.MoveTowards(transform.position, _targetPoint.position, _moveSpeed * Time.deltaTime);
 
-            if (Vector3.Distance(transform.position, _targetPoint.position) <= stopDistance)
+            if (Vector3.Distance(transform.position, _targetPoint.position) <= 0.1f)
             {
                 _isMoving = false;
             }
         }
 
-        // 2. 인내심 로직 (활성화 상태일 때만)
-        if (!_isActive) return;
-
-        _timer -= Time.deltaTime;
-        if (patienceSlider != null) patienceSlider.value = _timer;
-
-        // 시간 초과
-        if (_timer <= 0)
+        // 인내심 로직
+        if (_isActive)
         {
-            HandleFail();
+            _timer -= Time.deltaTime;
+            if (patienceSlider != null) patienceSlider.value = _timer;
+
+            if (_timer <= 0)
+            {
+                HandleFail("Time Out");
+            }
         }
     }
 
-    public void MoveTo(Transform target)
-    {
-        _targetPoint = target;
-        _isMoving = true;
+    // ==================================================================================
+    // 3. 행동 패턴 (AI Routines)
+    // ==================================================================================
 
-        // 스프라이트 좌우 반전 (바라보는 방향)
-        if (target.position.x < transform.position.x)
-            transform.localScale = new Vector3(-1, 1, 1);
-        else
-            transform.localScale = new Vector3(1, 1, 1);
-    }
-
-    IEnumerator GeneralCustomerRoutine()
+    // [일반 손님] 산책 -> 진열대 -> 구매 -> 퇴장
+    IEnumerator GeneralShoppingRoutine()
     {
+        // 1. 산책 (1~2군데 들름)
         if (_roamPoints != null && _roamPoints.Length > 0)
         {
             int visitCount = Random.Range(1, 3);
@@ -138,72 +141,126 @@ public class Customer : MonoBehaviour
             {
                 Transform randomPoint = _roamPoints[Random.Range(0, _roamPoints.Length)];
                 MoveTo(randomPoint);
-
                 yield return new WaitUntil(() => !_isMoving);
-                yield return new WaitForSeconds(Random.Range(1.0f, 2.0f));
+                yield return new WaitForSeconds(Random.Range(0.5f, 1.5f)); // 아이쇼핑
             }
         }
 
-        MoveTo(_finalDestination);
+        // 2. 목표 진열대로 이동
+        if (_targetShelf != null)
+        {
+            MoveTo(_targetShelf.transform);
+            yield return new WaitUntil(() => !_isMoving);
+
+            // 도착 후 잠시 고민하는 연출
+            yield return new WaitForSeconds(0.5f);
+
+            // 3. 구매 시도
+            TryBuyFromShelf();
+        }
+        else
+        {
+            HandleFail("No Shelf Found");
+        }
     }
 
-    public bool ReceiveItem(ItemData item)
+    // [일반 손님] 진열대 구매 로직
+    private void TryBuyFromShelf()
     {
-        if (item != wantedItem) return false;
+        if (_targetShelf == null) return;
+
+        // 진열대에서 물건 하나 꺼내기 (가격 반환)
+        int price = _targetShelf.TryTakeStock();
+
+        if (price > 0)
+        {
+            // 구매 성공
+            MoneyManager.Instance.AddBion(price);
+
+            // (옵션) 말풍선에 "스마일" 아이콘 띄우기 등의 연출 추가 가능
+            Debug.Log($"{customerName} 구매 성공! (+{price} Bion)");
+
+            HandleSuccess();
+        }
+        else
+        {
+            // 재고 없음 -> 실망하고 퇴장
+            Debug.Log($"{customerName} 구매 실패 (재고 없음)");
+            HandleFail("Out of Stock");
+        }
+    }
+
+    // [픽업 손님] 플레이어가 직접 건네주는 아이템 받기
+    public bool ReceivePickupItem(ItemData item)
+    {
+        if (type != CustomerType.Pickup) return false; // 일반 손님은 직접 안 받음
+        if (item != wantedItem) return false;          // 원하는 물건 아님
 
         currentReceivedCount++;
-        UpdateCountUI();
+        UpdatePickupCountUI();
 
+        // 목표 수량 달성
         if (currentReceivedCount >= wantedCount)
         {
+            int reward = item.basePrice * wantedCount * 2; // 픽업은 2배 보상 (예시)
+            MoneyManager.Instance.AddBion(reward);
+            Debug.Log($"픽업 완료! (+{reward} Bion)");
+
             HandleSuccess();
         }
         return true;
     }
 
+    // ==================================================================================
+    // 4. 공통 기능 (Movement, Finish)
+    // ==================================================================================
+
+    public void MoveTo(Transform target)
+    {
+        _targetPoint = target;
+        _isMoving = true;
+
+        // 바라보는 방향 전환 (Flip)
+        if (target.position.x < transform.position.x)
+            transform.localScale = new Vector3(-1, 1, 1);
+        else
+            transform.localScale = new Vector3(1, 1, 1);
+    }
+
     void HandleSuccess()
     {
         _isActive = false;
-        int reward = basePrice * wantedCount;
-
-        if (type == CustomerType.Pickup)
-        {
-            reward *= 2;
-            Debug.Log("픽업 배송 성공! (2배 보상)");
-        }
-
-        MoneyManager.Instance.AddBion(reward);
+        // 퇴장 연출 (기쁨)
         Leave();
     }
 
-    void HandleFail()
+    void HandleFail(string reason)
     {
         _isActive = false;
 
+        // 픽업 손님은 실패 시 위약금
         if (type == CustomerType.Pickup)
         {
-            int penalty = basePrice * wantedCount;
-            Debug.Log($"픽업 시간 초과! 위약금: -{penalty}");
+            int penalty = (wantedItem != null) ? wantedItem.basePrice * wantedCount : 100;
             MoneyManager.Instance.ApplyPenalty(penalty);
-        }
-        else
-        {
-            Debug.Log("일반 손님이 떠났습니다. (패널티 없음)");
+            Debug.Log($"픽업 실패 ({reason}) - 위약금 {penalty}");
         }
 
         Leave();
-    }
-
-    void UpdateCountUI()
-    {
-        if (countText != null) countText.text = $"x{wantedCount - currentReceivedCount}";
     }
 
     void Leave()
     {
+        // 매니저 목록에서 제거 알림
         if (CustomerManager.Instance != null)
             CustomerManager.Instance.OnCustomerLeft(this);
 
-        Destroy(gameObject);
+        Destroy(gameObject); // 혹은 풀링 시스템 사용 시 ReturnToPool
+    }
+
+    void UpdatePickupCountUI()
+    {
+        if (countText != null)
+            countText.text = $"{currentReceivedCount}/{wantedCount}";
     }
 }

@@ -7,13 +7,14 @@ public class HeatWaveEffect : WeatherEffectSO
 {
     public override float GetDecayMultiplier(CargoProperty cargo)
     {
-        // 1. 실온 보관 아이템은 날씨 영향 없음
         if (cargo.StorageType == StorageType.RoomTemp) return 0f;
+        if (cargo.StorageType == StorageType.Heated && !cargo.IsNearCold) return 1f;
+        if (cargo.StorageType == StorageType.Heated && cargo.IsNearCold) return -1f;
+        if (cargo.IsNearCold && (cargo.StorageType == StorageType.Liquid || cargo.StorageType == StorageType.Refrigerated))
+        {
+            return 0f;
+        }
 
-        // 3. 온장 물품이 아니거나 냉기 없으면 3배 가속
-        float multiplier = 1.0f;
-        if (!cargo.IsNearCold && cargo.StorageType != StorageType.Heated) multiplier = 3.0f;
-
-        return multiplier;
+        return 3.0f;
     }
 }

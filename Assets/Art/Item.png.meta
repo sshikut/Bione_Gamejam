@@ -184,10 +184,10 @@ TextureImporter:
       name: Item_4
       rect:
         serializedVersion: 2
-        x: 116
-        y: 152
-        width: 19
-        height: 32
+        x: 118
+        y: 159
+        width: 17
+        height: 25
       alignment: 0
       pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}

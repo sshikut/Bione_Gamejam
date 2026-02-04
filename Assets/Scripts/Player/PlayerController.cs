@@ -3,9 +3,6 @@ using UnityEngine;
 [RequireComponent(typeof(Rigidbody2D))]
 public class PlayerController : MonoBehaviour
 {
-    [Header("Movement")]
-    public float moveSpeed = 5f;
-
     [Header("Snapping")]
     public float snapSpeed = 10f;
     public float snapThreshold = 0.01f;
@@ -14,6 +11,8 @@ public class PlayerController : MonoBehaviour
     private Vector2 _inputDir;
     private Vector2Int _currentGridPos; // 현재 캐릭터가 서 있는 그리드 좌표
 
+    private PlayerStats _stats;
+
     void Start()
     {
         _rb = GetComponent<Rigidbody2D>();
@@ -21,6 +20,8 @@ public class PlayerController : MonoBehaviour
         _rb.gravityScale = 0;
         _rb.freezeRotation = true;
         _rb.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
+
+        _stats = GetComponent<PlayerStats>();
     }
 
     void Update()
@@ -46,7 +47,9 @@ public class PlayerController : MonoBehaviour
         // 물리를 이용한 이동 (벽 비비기 가능)
         if (_inputDir != Vector2.zero)
         {
-            _rb.MovePosition(_rb.position + _inputDir * moveSpeed * Time.fixedDeltaTime);
+            float currentSpeed = _stats.CurrentMoveSpeed;
+
+            _rb.MovePosition(_rb.position + _inputDir * currentSpeed * Time.fixedDeltaTime);
         }
         else
         {

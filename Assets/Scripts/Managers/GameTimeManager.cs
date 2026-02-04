@@ -8,6 +8,7 @@ public class GameTimeManager : MonoBehaviour
     [Header("Game Settings")]
     public int maxDays = 14;
     public float tickInterval = 1.0f;
+    public AugmentSelector augmentUI;
 
     [Header("Phase Durations (Seconds)")]
     // 기획서에 따른 시간 설정
@@ -157,6 +158,8 @@ public class GameTimeManager : MonoBehaviour
     {
         ChangeState(GameState.DayEnded);
         OnDayEnded?.Invoke(currentDay); // 정산창 띄우기
+
+        augmentUI.ShowSelectionUI();
     }
 
     // 다음 날 시작 (정산창 Next 버튼)

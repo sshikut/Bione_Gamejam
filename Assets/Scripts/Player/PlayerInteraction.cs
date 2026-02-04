@@ -3,17 +3,18 @@ using System.Collections.Generic; // 리스트 사용을 위해 필수
 
 public class PlayerInteraction : MonoBehaviour
 {
-    [Header("Settings")]
-    public float interactionRange = 1.5f; // 인접 판정 거리 (그리드 1칸이 1.0이므로 1.5면 넉넉함)
-
     private Collider2D _playerCollider;
 
     // ★ [핵심 변경] 여러 개를 들기 위해 리스트로 변경
     private List<Cargo> _holdingCargos = new List<Cargo>();
 
+    [SerializeField] private PlayerStats _stats;
+
     void Start()
     {
         _playerCollider = GetComponent<Collider2D>();
+
+        if (_stats == null) _stats = GetComponent<PlayerStats>();
     }
 
     void Update()
@@ -45,6 +46,8 @@ public class PlayerInteraction : MonoBehaviour
 
             // 2. 실제 오브젝트 파괴
             Destroy(soldCargo.gameObject);
+
+            UpdateCarryCount();
 
             Debug.Log("플레이어: 물건 판매 완료! (리스트에서 제거됨)");
         }
@@ -78,25 +81,26 @@ public class PlayerInteraction : MonoBehaviour
     // 집기 로직
     void TryPickUp(Cargo cargo)
     {
-        // 1. 거리가 가까운지 확인 (인접 체크)
-        // 플레이어 중심과 화물 중심 사이의 거리 계산
+        if (_holdingCargos.Count >= _stats.MaxCapacity)
+        {
+            Debug.Log("너무 무거워서 더 들 수 없습니다! (업그레이드 필요)");
+            return; // 줍기 실패
+        }
+
         float distance = Vector3.Distance(transform.position, cargo.transform.position);
 
-        if (distance <= interactionRange)
+        if (distance <= _stats.baseInteractionRange)
         {
-            // 장부에서 제거
             GridManager.Instance.UnregisterCargo(cargo.CurrentGridPos);
-
-            // 리스트에 추가
             _holdingCargos.Add(cargo);
-
-            // 화물에게 "나한테 붙어!" 명령 (이전 코드 활용)
-            // Cargo 스크립트가 offset을 계산해서 알아서 플레이어 주변에 붙음
             cargo.OnPickedUp(transform, _playerCollider);
+
+            // [추가] 2. 무게 업데이트 (이동속도 감소됨)
+            UpdateCarryCount();
         }
         else
         {
-            Debug.Log("너무 멉니다! 가까이 가서 클릭하세요.");
+            Debug.Log("너무 멉니다!");
         }
     }
 
@@ -124,6 +128,8 @@ public class PlayerInteraction : MonoBehaviour
 
             // 장부 등록
             GridManager.Instance.RegisterCargo(currentGridPos, cargo);
+
+            UpdateCarryCount();
         }
         else
         {
@@ -144,10 +150,18 @@ public class PlayerInteraction : MonoBehaviour
         }
     }
 
+    void UpdateCarryCount()
+    {
+        if (_stats != null)
+        {
+            _stats.currentCarryCount = _holdingCargos.Count;
+        }
+    }
+
     // 디버깅: 인접 범위 그리기
     private void OnDrawGizmosSelected()
     {
         Gizmos.color = Color.cyan;
-        Gizmos.DrawWireSphere(transform.position, interactionRange);
+        Gizmos.DrawWireSphere(transform.position, _stats.baseInteractionRange);
     }
 }

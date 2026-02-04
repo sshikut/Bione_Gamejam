@@ -9,12 +9,14 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 08bfcf151c50cfc41b9303be3b235f30, type: 3}
-  m_Name: Freeze
+  m_Script: {fileID: 11500000, guid: 8e45cd7b29f984a47b102269794b1844, type: 3}
+  m_Name: Tier1_ExpressDelivery
   m_EditorClassIdentifier: 
-  category: 1
-  itemName: Freeze_0
-  icon: {fileID: 21300000, guid: ee75f784818d3d9478456bd06b4c6a8e, type: 3}
-  displayColor: {r: 1, g: 1, b: 1, a: 1}
-  storageType: 2
-  maxFreshness: 100
+  id: 
+  augmentName: "\uC2E0\uC18D \uBC30\uC1A1 I"
+  description: 
+  icon: {fileID: 0}
+  tier: 1
+  speedAdd: 0.5
+  capacityAdd: 0
+  resistanceAdd: 0

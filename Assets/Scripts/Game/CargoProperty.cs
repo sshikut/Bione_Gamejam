@@ -108,20 +108,13 @@ public class CargoProperty : CargoTrait
             weatherMultiplier = WeatherManager.Instance.currentWeatherEffect.GetDecayMultiplier(this); // 날씨 효과 적용
         }
 
-        float nearMultiplier = 1f;
-        if (StorageType != StorageType.Heated && IsNearHeat) nearMultiplier = 2f;
-        else if (StorageType != StorageType.Heated && IsNearCold) nearMultiplier = -1f;
-
         // 기타 상태 처리
         CheckFreezingBurst();
         HandleStateEffects();
 
-        float finalMultiplier;
+        float totalMultiplier = weatherMultiplier; // 추후 증강 및 아이템 생기면 반영할 수치
 
-        if (nearMultiplier >= weatherMultiplier) finalMultiplier = nearMultiplier;
-        else finalMultiplier = weatherMultiplier;
-
-        ModifyFreshness(_decayAmount * finalMultiplier);
+        ModifyFreshness(_decayAmount * totalMultiplier);
     }
 
     private void ScanSurroundings()
@@ -144,7 +137,7 @@ public class CargoProperty : CargoTrait
                 {
                     // 열기는 8방향, 냉기는 4방향(또는 8방향) 등 기획에 따라 조절
                     if (CargoInteractionLogic.IsHeatSource(neighborProp) && (data.storageType != StorageType.Heated)) _isNearHeat = true;
-                    if (CargoInteractionLogic.IsColdSource(neighborProp) && (data.storageType != StorageType.Heated)) _isNearCold = true;
+                    if (CargoInteractionLogic.IsColdSource(neighborProp)) _isNearCold = true;
                 }
             }
         }

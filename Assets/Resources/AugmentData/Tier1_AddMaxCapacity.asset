@@ -1,0 +1,22 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8e45cd7b29f984a47b102269794b1844, type: 3}
+  m_Name: Tier1_AddMaxCapacity
+  m_EditorClassIdentifier: 
+  id: 
+  augmentName: "\uC6B4\uB3D9 \uB9CE\uC774 \uB41C\uB2E4 I"
+  description: "\uB4E4 \uC218 \uC788\uB294 \uBB3C\uD488\uC774 1\uAC1C \uC99D\uAC00\uD569\uB2C8\uB2E4."
+  icon: {fileID: 21300000, guid: 6ccff75d6aa11e6419abad8a5ca69dad, type: 3}
+  tier: 1
+  speedAdd: 0
+  capacityAdd: 1
+  resistanceAdd: 0

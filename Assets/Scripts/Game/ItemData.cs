@@ -15,6 +15,7 @@ public class ItemData : ScriptableObject
     [Header("Attributes")]
     public StorageType storageType; // 보관 속성 (냉장, 냉동 등)
     public int maxFreshness = 100;  // 최대 신선도 (물건마다 다를 수 있음)
+    public int basePrice = 100;
 
     private void OnValidate()
     {
