@@ -59,9 +59,9 @@ public class WeatherManager : MonoBehaviour
         // (스케줄표는 나중에 별도 데이터로 뺄 수도 있지만, 일단 여기 둬도 무방)
         switch (newDay)
         {
-            // case 2: targetType = Weather.HeatWave; break;
-            // case 4: targetType = Weather.RainySeason; break;
-            // case 6: targetType = Weather.ColdWave; break;
+            case 2: targetType = Weather.HeatWave; break;
+            case 4: targetType = Weather.RainySeason; break;
+            case 6: targetType = Weather.ColdWave; break;
             default: targetType = Weather.Normal; break;
         }
 
