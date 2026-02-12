@@ -15,6 +15,8 @@ public class GridManager : MonoBehaviour
 
     private HashSet<Vector2Int> _dangerZones = new HashSet<Vector2Int>();
 
+    public List<Cargo> activeCargos = new List<Cargo>();
+
     private void Awake()
     {
         if (Instance == null) Instance = this;
@@ -90,6 +92,11 @@ public class GridManager : MonoBehaviour
             cargo.CurrentGridPos = gridPos;
         }
 
+        if (!activeCargos.Contains(cargo)) // UI용 물류 등록
+        {
+            activeCargos.Add(cargo);
+        }
+
         // 2. [추가된 핵심 로직] 등록된 위치가 '위험 구역'인지 체크 -> 게임 오버!
         if (_dangerZones.Contains(gridPos))
         {
@@ -104,6 +111,25 @@ public class GridManager : MonoBehaviour
     }
 
     public void UnregisterCargo(Vector2Int gridPos) { if (_gridContents.ContainsKey(gridPos)) _gridContents.Remove(gridPos); }
+
+    public void OnCargoDestroyed(Cargo cargo)
+    {
+        if (activeCargos.Contains(cargo))
+        {
+            activeCargos.Remove(cargo);
+        }
+
+        // 혹시 그리드에 남아있다면 제거 (안전장치)
+        if (_gridContents.ContainsKey(cargo.CurrentGridPos) && _gridContents[cargo.CurrentGridPos] == cargo)
+        {
+            _gridContents.Remove(cargo.CurrentGridPos);
+        }
+    }
+
+    public List<Cargo> GetAllCargos()
+    {
+        return activeCargos;
+    }
 
     // 기즈모 그리기 (중앙 정렬에 맞춰 수정됨)
     private void OnDrawGizmos()

@@ -2,6 +2,9 @@ using UnityEngine;
 
 public class Cargo : MonoBehaviour
 {
+    [Header("Components")]
+    public CargoProperty property;
+
     [Header("Status")]
     public Vector2Int CurrentGridPos; // 현재 내가 있는 그리드 좌표
     public bool isHeld = false;
@@ -23,6 +26,7 @@ public class Cargo : MonoBehaviour
     private void Awake()
     {
         _myCollider = GetComponent<Collider2D>();
+        if (property == null) property = GetComponent<CargoProperty>();
     }
 
     void Start()

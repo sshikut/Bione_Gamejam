@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI; // 버튼 제어용
-using TMPro; // TextMeshPro 사용
+using TMPro;
+using System.Collections.Generic; // TextMeshPro 사용
 
 public class GameUIManager : MonoBehaviour
 {
@@ -14,6 +15,25 @@ public class GameUIManager : MonoBehaviour
     [Header("UI References (Panels)")]
     public GameObject resultPanel;        // 정산 창 (하루 종료 시)
     public GameObject gameClearPanel;     // 엔딩 창 (14일 완료 시)
+
+    [Header("Cargo Status UI")]
+    public TextMeshProUGUI frozenBurstCountText;      // 동파
+    public TextMeshProUGUI spoiledCountText;    // 상함
+    public TextMeshProUGUI heatedStateCountText; // 가열
+    public TextMeshProUGUI wetCountText;     // 녹음 
+
+    [Header("Shelf Status UI")]
+    public TextMeshProUGUI commonCountText;
+    public TextMeshProUGUI heatedCountText;
+    public TextMeshProUGUI frozenCountText;
+    public TextMeshProUGUI refridgeratedCountText;
+    public TextMeshProUGUI liquidCountText;
+
+    public Shelf commonShelf;
+    public Shelf heatedShelf;
+    public Shelf frozenShelf;
+    public Shelf refridgeratedShelf;
+    public Shelf liquidShelf;
 
     private void Start()
     {
@@ -29,7 +49,11 @@ public class GameUIManager : MonoBehaviour
             // 게임 클리어 시 호출
             GameTimeManager.Instance.OnGameClear += HandleGameClear;
 
-            // ★ 시작하자마자 현재 상태에 맞춰 UI 한 번 갱신
+            GameTimeManager.Instance.OnTickEvent += UpdateCounts;
+
+            GameTimeManager.Instance.OnTickEvent += UpdateShelfCounts;
+
+            // 시작하자마자 현재 상태에 맞춰 UI 한 번 갱신
             HandleStateChange(GameTimeManager.Instance.currentState);
             UpdateDayText(GameTimeManager.Instance.currentDay);
         }
@@ -61,6 +85,8 @@ public class GameUIManager : MonoBehaviour
             GameTimeManager.Instance.OnStateChanged -= HandleStateChange;
             GameTimeManager.Instance.OnDayEnded -= HandleDayEnded;
             GameTimeManager.Instance.OnGameClear -= HandleGameClear;
+            GameTimeManager.Instance.OnTickEvent -= UpdateCounts;
+            GameTimeManager.Instance.OnTickEvent -= UpdateShelfCounts;
         }
     }
 
@@ -182,5 +208,45 @@ public class GameUIManager : MonoBehaviour
         if (newWeather == null) return;
 
         if (weatherText != null) weatherText.text = newWeather.weatherName;
+    }
+
+    public void UpdateCounts()
+    {
+        int frozenBurst = 0;
+        int spoiled = 0;
+        int heatedState = 0;
+        int wet = 0;
+
+        // GridManager가 모든 화물 리스트를 관리한다고 가정
+        // 만약 GridManager에 리스트가 없다면, FindObjectsOfType으로 찾거나 리스트를 만들어야 함
+        List<Cargo> allCargos = GridManager.Instance.GetAllCargos();
+
+        foreach (var cargo in allCargos)
+        {
+            if (cargo.property == null) continue;
+
+            switch (cargo.property.currentState)
+            {
+                case CargoState.FrozenBurst: frozenBurst++; break;
+                case CargoState.Spoiled: spoiled++; break;
+                case CargoState.HeatedState: heatedState++; break;
+                case CargoState.Wet: wet++; break;
+            }
+        }
+
+        // UI 적용
+        if (frozenBurstCountText != null) frozenBurstCountText.text = $"{frozenBurst}";
+        if (spoiledCountText != null) spoiledCountText.text = $"{spoiled}";
+        if (heatedStateCountText != null) heatedStateCountText.text = $"{heatedState}";
+        if (wetCountText != null) wetCountText.text = $"{wet}";
+    }
+
+    public void UpdateShelfCounts()
+    {
+        commonCountText.text = commonShelf.CurrentStock.ToString();
+        heatedCountText.text = heatedShelf.CurrentStock.ToString();
+        frozenCountText.text = frozenShelf.CurrentStock.ToString();
+        refridgeratedCountText.text = refridgeratedShelf.CurrentStock.ToString();
+        liquidCountText.text = liquidShelf.CurrentStock.ToString();
     }
 }

@@ -24,7 +24,12 @@ public class DeliveryZone : MonoBehaviour
             for (int i = holdingList.Count - 1; i >= 0; i--)
             {
                 Cargo cargo = holdingList[i];
-
+                if (cargo.property.currentState != CargoState.Normal)
+                {
+                    Debug.Log("정상인 상품만 팔아라 이것아");
+                    return;
+                }
+                    
                 // 진열대에 넣기 시도 (속성 매칭 & 공간 확인 내부 수행)
                 if (linkedShelf.TryAddStock(cargo.data))
                 {
