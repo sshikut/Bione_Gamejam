@@ -99,6 +99,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6ba74e3816cc9d440b033ad5d370a9e4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  property: {fileID: 0}
   CurrentGridPos: {x: 0, y: 0}
   isHeld: 0
   _moveSpeed: 15
@@ -170,5 +171,5 @@ MonoBehaviour:
   freezingStack: 0
   _isNearHeat: 0
   _isNearCold: 0
-  _decayAmount: 1
+  _decayAmount: 0.1
   testBool: 0
