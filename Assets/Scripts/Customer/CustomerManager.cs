@@ -179,23 +179,45 @@ public class CustomerManager : MonoBehaviour
     {
         if (pickupDataList.Length == 0) return;
 
-        // 1. 랜덤 아이템 및 수량 결정
-        ItemData randomItem = menu[Random.Range(0, menu.Count)];
-        int count = Random.Range(1, 4); // 1~3개 요구
-        CustomerData data = pickupDataList[Random.Range(0, pickupDataList.Length)];
+        // 1. 현재 존재하는 모든 화물 리스트 가져오기
+        List<Cargo> activeCargos = GridManager.Instance.GetAllCargos();
 
-        // 2. 생성
+        // 2. 맵에 물건이 없으면 스폰 취소
+        if (activeCargos == null || activeCargos.Count == 0)
+        {
+            return;
+        }
+
+        // 3. 랜덤 화물 하나 선택 (손님이 원하는 아이템 타입 결정)
+        Cargo selectedCargo = activeCargos[Random.Range(0, activeCargos.Count)];
+        ItemData targetItem = selectedCargo.data;
+
+        // [심화 로직] 4. 해당 아이템의 현재 재고 수량 파악하기
+        // (리스트 전체를 뒤져서 방금 고른 아이템이랑 똑같은 게 몇 개인지 셉니다)
+        int currentStock = activeCargos.Count(c => c.data == targetItem);
+
+        // 5. 요청 수량 결정 (재고 한도 내에서)
+        // 로직: "기본적으로 최대 3개를 원하지만(Gameplay Limit), 재고가 그보다 적으면 재고만큼만 요구한다."
+        // 예시 A: 재고 10개 -> Min(10, 3) = 3 -> 1~3개 랜덤 요청
+        // 예시 B: 재고 2개  -> Min(2, 3) = 2 -> 1~2개 랜덤 요청
+        // 예시 C: 재고 1개  -> Min(1, 3) = 1 -> 1개 요청
+
+        int maxRequest = Mathf.Min(currentStock, 3);
+        int count = Random.Range(1, maxRequest + 1); // (+1 필수: Random.Range 정수는 Max값 제외함)
+
+        // 6. 손님 데이터 및 생성
+        CustomerData data = pickupDataList[Random.Range(0, pickupDataList.Length)];
         GameObject obj = Instantiate(customerPrefab, pickupSpawnPoint.position, Quaternion.identity);
         Customer customer = obj.GetComponent<Customer>();
 
-        // 3. 초기화 (특정 아이템과 카운터 위치 전달)
-        customer.InitializePickup(randomItem, count, pickupCounterPoint, data);
+        // 7. 초기화
+        customer.InitializePickup(targetItem, count, pickupCounterPoint, data);
 
-        // 4. 매니저에 등록 (자리 차지)
+        // 8. 매니저 등록
         _currentPickupCustomer = customer;
         _pickupSpawnedCount++;
 
-        Debug.Log($"픽업 손님 등장! 요구: {randomItem.itemName} x{count}");
+        Debug.Log($" 픽업 손님 등장! (재고: {currentStock}개) -> 요구: {targetItem.itemName} x{count}");
     }
 
     // --- [외부 접근 및 이벤트 처리] ---
