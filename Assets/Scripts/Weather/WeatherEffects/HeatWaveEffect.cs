@@ -22,11 +22,11 @@ public class HeatWaveEffect : WeatherEffectSO
 
         // 3. [냉동 / 냉장 / 액상] 물품 로직
 
-        // 중요 규칙: "열기/냉기 둘 다 받으면? = 폭염 효과만 (x3)"
+        // 중요 규칙: "열기/냉기 둘 다 받으면? = 폭염 효과만 (x5)"
         // (냉기의 보호 효과가 무효화됨)
         if (cargo.IsNearHeat && cargo.IsNearCold)
         {
-            return 3.0f;
+            return 5.0f;
         }
 
         // 4. 냉기 보호 (위의 '둘 다 받음' 조건을 통과했으므로 여기서는 '냉기만' 있는 상태)
@@ -38,7 +38,7 @@ public class HeatWaveEffect : WeatherEffectSO
         }
 
         // 5. 기본 폭염 효과
-        // 규칙: "기본으로 온장 제외 신선도 감소 x3"
-        return 3.0f;
+        // 규칙: "기본으로 온장 제외 신선도 감소 x5"
+        return 5.0f;
     }
 }
